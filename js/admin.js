@@ -56,7 +56,6 @@ async function viewList(state) {
     </div>`}
     <input type="search" class="search" id="q" placeholder="조사 제목 검색" aria-label="조사 제목 검색">
     <div id="lists"></div>
-    <footer><a href="./#${currentGroup}">학부모용 목록 보기</a></footer>
   `;
   bindSignOut();
   $$(".tab").forEach((b) => b.addEventListener("click", () => { currentGroup = b.dataset.g; viewList(state); }));
