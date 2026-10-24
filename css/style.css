@@ -193,3 +193,19 @@ footer a { color: var(--muted); }
 body.has-bar .wrap { padding-bottom: 110px; }
 @media (min-width: 560px) { .grid2 { grid-template-columns: 1fr 1fr; } }
 @media (prefers-color-scheme: dark) { .pill.closed { background: var(--line); } }
+
+/* ---------- 관리자 결과 화면 ---------- */
+.tiles { display: flex; gap: 8px; margin: 12px 0; }
+.tile { flex: 1; min-width: 0; background: var(--accent-soft); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; }
+.tile b { font-size: 1.35rem; line-height: 1.2; color: var(--accent-text); }
+.tile.wide { flex: 2; }
+.tile.wide b { font-size: 0.98rem; line-height: 1.6; color: var(--ink); }
+.tile.warn { background: var(--warn-soft); }
+.tile.warn b { color: var(--warn); }
+.tile span { font-size: 0.8rem; color: var(--muted); }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.actions .btn { padding: 12px 8px; }
+details.more { margin-top: 10px; }
+details.more > summary { margin: 0; padding: 10px 0 2px; text-align: center; cursor: pointer; color: var(--accent-text); font-weight: 600; font-size: 0.92rem; }
+.more-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.more-list .btn.danger { grid-column: 1 / -1; }
