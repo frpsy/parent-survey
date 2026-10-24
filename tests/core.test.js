@@ -124,3 +124,12 @@ test("양식은 모두 유효", () => {
     assert.deepEqual(validateSurvey({ ...t, group: "ssiat" }), []);
   }
 });
+
+test("샘플 조사와 응답은 유효", async () => {
+  const { sampleSurveys, sampleResponses } = await import("../js/samples.js");
+  assert.deepEqual(sampleSurveys.map((s) => s.group).sort(), ["grade", "ssiat"]);
+  for (const s of sampleSurveys) {
+    assert.deepEqual(validateSurvey(s), []);
+    for (const r of sampleResponses[s.id]) assert.deepEqual(validateResponse(s, r.name, r.answers), [], r.name);
+  }
+});
