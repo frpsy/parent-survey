@@ -209,3 +209,19 @@ details.more { margin-top: 10px; }
 details.more > summary { margin: 0; padding: 10px 0 2px; text-align: center; cursor: pointer; color: var(--accent-text); font-weight: 600; font-size: 0.92rem; }
 .more-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
 .more-list .btn.danger { grid-column: 1 / -1; }
+
+/* ---------- 모바일 줄바꿈·관리자 보완 ---------- */
+h1, h2, h3, .hero h1 { text-wrap: balance; }
+p, .sub, .meta, .hint, .names, .menu-item, .q-label, .person .what, .banner, .errors { text-wrap: pretty; overflow-wrap: break-word; }
+.stat span:last-child, .resp-row span:last-child, .names, .person .who, td { overflow-wrap: anywhere; }
+.wrap, .card { min-width: 0; }
+textarea.tall { min-height: 170px; line-height: 1.6; overflow: hidden; }
+.savebar { position: sticky; bottom: 0; margin: 14px -16px -16px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--card); border-top: 1px solid var(--line); border-radius: 0 0 var(--radius) var(--radius); z-index: 4; }
+.editor-q .btn.small { min-height: 40px; min-width: 40px; }
+.resp { padding: 12px 0; border-top: 1px solid var(--line); }
+.resp:first-of-type { border-top: 0; }
+.resp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+.resp-head b { font-size: 1rem; }
+.resp-row { display: flex; justify-content: space-between; gap: 14px; padding: 4px 0; font-size: 0.92rem; }
+.resp-row span:first-child { color: var(--muted); flex: none; max-width: 42%; }
+.resp-row span:last-child { text-align: right; flex: 1; min-width: 0; }

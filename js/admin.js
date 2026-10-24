@@ -63,7 +63,7 @@ async function viewList(state) {
   const adminCard = (s) => `<a class="card" href="#r/${s.id}">
       <h3>${escapeHtml(s.title)}</h3>
       <div class="meta">
-        <span class="pill ${isOpen(s) ? "" : "closed"}">${isOpen(s) ? "진행 중" : "마감"}</span>
+        <span class="pill ${dueLabel(s).tone}">${escapeHtml(dueLabel(s).text)}</span>
         <span>응답 ${counts[s.id]}명</span>
         <span>마감 ${escapeHtml(formatDeadline(s.deadlineMs))}</span>
         ${s.source === "repo" ? `<span class="pill">파일</span>` : ""}
@@ -141,8 +141,8 @@ async function viewEdit(state, draft, hasResponses) {
         <select id="group">${groups.map((g) => `<option value="${g.id}" ${draft.group === g.id ? "selected" : ""}>${escapeHtml(g.name)}</option>`).join("")}</select>
         <label class="field">제목</label>
         <input type="text" id="title" value="${escapeHtml(draft.title)}" maxlength="60">
-        <label class="field">안내 문구 <span class="hint">(선택)</span></label>
-        <textarea id="desc" maxlength="1000">${escapeHtml(draft.desc || "")}</textarea>
+        <label class="field">상세 설명 <span class="hint">(줄바꿈 그대로 보입니다. 줄이지 말고 전부 적어 주세요)</span></label>
+        <textarea id="desc" class="tall" maxlength="3000">${escapeHtml(draft.desc || "")}</textarea>
         <label class="field">마감 <span class="hint">비우면 직접 마감할 때까지 받습니다</span></label>
         <input type="datetime-local" id="deadline" value="${toLocalInput(draft.deadlineMs)}">
         <label class="row" style="margin-top:12px"><input type="checkbox" id="pub" ${draft.publicResults ? "checked" : ""}> 모두에게 실시간 현황판 공개 (이름 포함)</label>
@@ -152,11 +152,15 @@ async function viewEdit(state, draft, hasResponses) {
           <button type="button" class="btn small" id="addq">+ 질문 추가</button>
         </div>
         ${errorsBox(errors)}
-        <button class="btn primary block" type="submit" style="margin-top:12px">저장</button>
+        <div class="savebar"><button class="btn primary block" type="submit">저장</button></div>
       </form>
     `;
     bindSignOut();
     bindEditor();
+    const dd = $("#desc");
+    const grow = () => { dd.style.height = "auto"; dd.style.height = `${dd.scrollHeight + 2}px`; };
+    dd.addEventListener("input", grow);
+    grow();
   };
 
   const sync = () => {
@@ -386,10 +390,11 @@ async function viewResult(state, id) {
       </div>` : groups.find((g) => g.id === survey.group)?.roster === false ? "" : `<p class="sub" style="margin:0 0 12px">명단을 넣으면 미응답 가정을 볼 수 있습니다. <a href="#roster/${escapeHtml(survey.group)}">명단 넣기</a></p>`}
       ${responses.length ? aggregate(survey, responses).map(resultCard).join("") : `<div class="empty">아직 응답이 없습니다. 카톡 공지를 복사해 단톡방에 올려 보세요.</div>`}
       ${responses.length ? `<div class="card"><h3>응답자 ${responses.length}명</h3>
-        <div class="table-scroll"><table class="list">
-          <thead><tr><th>이름</th>${survey.questions.map((q) => `<th>${escapeHtml(q.label)}</th>`).join("")}<th></th></tr></thead>
-          <tbody>${sortByName(responses).map((r) => `<tr><td>${escapeHtml(r.name)}</td>${survey.questions.map((q) => `<td>${escapeHtml(answerText(q, r.answers?.[q.id]))}</td>`).join("")}<td><button class="btn small danger" data-delr="${escapeHtml(r.id)}" aria-label="${escapeHtml(r.name)} 응답 삭제">삭제</button></td></tr>`).join("")}</tbody>
-        </table></div></div>` : ""}
+        ${sortByName(responses).map((r) => `<div class="resp">
+          <div class="resp-head"><b>${escapeHtml(r.name)}</b><button class="btn small danger" data-delr="${escapeHtml(r.id)}" aria-label="${escapeHtml(r.name)} 응답 삭제">삭제</button></div>
+          ${survey.questions.map((q) => { const t = answerText(q, r.answers?.[q.id]); return t ? `<div class="resp-row"><span>${escapeHtml(q.label)}</span><span>${escapeHtml(t)}</span></div>` : ""; }).join("")}
+        </div>`).join("")}
+      </div>` : ""}
     `;
     bindSignOut();
     $("#more").addEventListener("toggle", (e) => { moreOpen = e.target.open; });
