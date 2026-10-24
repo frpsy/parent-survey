@@ -11,7 +11,7 @@ service cloud.firestore {
     function isAdmin() {
       return request.auth != null
         && request.auth.token.email_verified == true
-        && request.auth.token.email in ['YOUR_EMAIL@gmail.com'];
+        && request.auth.token.email in ['lgpsy83@gmail.com'];
     }
 
     // 학부모 명단: 관리자만 (공개 사이트에서 읽히지 않음)
