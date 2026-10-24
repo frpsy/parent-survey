@@ -9,13 +9,13 @@ import {
   won, sortByName, parseRoster, rosterToText, matchRoster, buildReminderText,
   parseSurveyText, surveyToText, nextRound, dueLabel,
 } from "./core.js";
-import { $, $$, header, modeBanner, groupName, errorsBox, toast, copyText, surveyUrl, fail } from "./ui.js";
+import { $, $$, header, modeBanner, groupName, errorsBox, toast, copyText, surveyUrl, fail, themeButton } from "./ui.js";
 
 const root = $("#app");
 let currentGroup = groups[0].id;
 
 function signOutBtn(state) {
-  return `<button class="btn small" id="signout" title="${escapeHtml(state.email || "")}">로그아웃</button>`;
+  return `${themeButton()}<button class="btn small" id="signout" title="${escapeHtml(state.email || "")}">로그아웃</button>`;
 }
 function bindSignOut() {
   $("#signout")?.addEventListener("click", async () => { await adminSignOut(); route(); });

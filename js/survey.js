@@ -3,7 +3,7 @@ import {
   escapeHtml, formatDeadline, isOpen, validateResponse, cleanAnswers, ATTEND_CHOICES,
   answerText, aggregate, won, dueLabel, buildSummaryText,
 } from "./core.js";
-import { $, $$, header, modeBanner, groupName, errorsBox, toast, fail, shareLink, surveyUrl, copyText, themeButton } from "./ui.js";
+import { $, $$, header, modeBanner, groupName, errorsBox, toast, fail, shareLink, surveyUrl, copyText } from "./ui.js";
 
 const root = $("#app");
 const id = new URLSearchParams(location.search).get("id");
@@ -201,7 +201,6 @@ async function render(survey, mine, message = "") {
         <span class="spacer"></span>
         ${mine && !showForm && open ? `<button class="btn small" id="edit2" type="button">내 응답 수정</button>` : ""}
         <button class="btn small" id="share" type="button">공유</button>
-        ${themeButton()}
       </div>
       <h1>${escapeHtml(survey.title)}</h1>
       ${survey.desc ? `<p>${escapeHtml(survey.desc)}</p>` : ""}
