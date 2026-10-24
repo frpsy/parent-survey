@@ -4,16 +4,16 @@
 // 2) adminEmails 에 관리자 구글 계정을 넣습니다. firestore.rules 의 이메일과 같아야 합니다.
 
 export const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: "",
+  apiKey: "AIzaSyB7VsDdAy_lTPwwlQ2QCImdYSYKwhVyQ1k",
+  authDomain: "parent-survey-d21e7.firebaseapp.com",
+  projectId: "parent-survey-d21e7",
+  storageBucket: "parent-survey-d21e7.firebasestorage.app",
+  messagingSenderId: "754087097956",
+  appId: "1:754087097956:web:5beb1e8d56cff487d59171",
 };
 
 export const adminEmails = [
-  // "your-account@gmail.com",
+  "lgpsy83@gmail.com",
 ];
 
 // 조사를 묶어서 관리하는 모임(그룹) 목록. 순서대로 탭에 표시됩니다.
