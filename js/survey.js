@@ -3,7 +3,7 @@ import {
   escapeHtml, formatDeadline, isOpen, validateResponse, cleanAnswers, ATTEND_CHOICES,
   answerText, aggregate, won, dueLabel, buildSummaryText,
 } from "./core.js";
-import { $, $$, header, modeBanner, groupName, errorsBox, toast, fail, markDone, shareLink, surveyUrl, copyText } from "./ui.js";
+import { $, $$, header, modeBanner, groupName, errorsBox, toast, fail, markDone, shareLink, surveyUrl, copyText, themeButton } from "./ui.js";
 
 const root = $("#app");
 const id = new URLSearchParams(location.search).get("id");
@@ -25,7 +25,7 @@ function qInput(q, a) {
     case "items":
       return q.options.map((o) => `<div class="menu-item ${(a?.[o.id] || 0) > 0 ? "on" : ""}">
         <div><div style="font-weight:600">${escapeHtml(o.label)}</div>${o.price ? `<div class="price">${won(o.price)}</div>` : ""}</div>
-        <div class="stepper row" style="gap:0;flex-wrap:nowrap">
+        <div class="stepper">
           <button type="button" data-step="-1" aria-label="${escapeHtml(o.label)} 줄이기">−</button>
           <input type="number" min="0" max="999" inputmode="numeric" data-item="${o.id}" value="${escapeHtml(a?.[o.id] || 0)}" aria-label="${escapeHtml(o.label)} 수량">
           <button type="button" data-step="1" aria-label="${escapeHtml(o.label)} 늘리기">+</button>
@@ -79,14 +79,8 @@ function readAnswers(survey) {
   return out;
 }
 
-function itemTotal(q, box) {
-  let qty = 0, sum = 0;
-  $$("[data-item]", box).forEach((i) => {
-    const n = Number(i.value) || 0;
-    qty += n;
-    const o = q.options.find((x) => x.id === i.dataset.item);
-    if (o?.price) sum += n * o.price;
-  });
+// 수량이 있는 품목 강조, 아래 바 갱신
+function itemTotal(box) {
   $$(".menu-item", box).forEach((m) => m.classList.toggle("on", Number($("input", m).value) > 0));
   updateBar();
 }
@@ -103,10 +97,10 @@ function bind(survey) {
       $$("[data-step]", box).forEach((b) => b.addEventListener("click", () => {
         const input = $("input", b.parentElement);
         input.value = Math.max(0, Math.min(999, (Number(input.value) || 0) + Number(b.dataset.step)));
-        itemTotal(q, box);
+        itemTotal(box);
       }));
-      $$("[data-item]", box).forEach((i) => i.addEventListener("input", () => itemTotal(q, box)));
-      itemTotal(q, box);
+      $$("[data-item]", box).forEach((i) => i.addEventListener("input", () => itemTotal(box)));
+      itemTotal(box);
     }
   }
 }
@@ -207,6 +201,7 @@ async function render(survey, mine, message = "") {
         <span class="spacer"></span>
         ${mine && !showForm && open ? `<button class="btn small" id="edit2" type="button">내 응답 수정</button>` : ""}
         <button class="btn small" id="share" type="button">공유</button>
+        ${themeButton()}
       </div>
       <h1>${escapeHtml(survey.title)}</h1>
       ${survey.desc ? `<p>${escapeHtml(survey.desc)}</p>` : ""}

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   parseOptions, mergeOptionIds, isOpen, formatDeadline, validateSurvey, validateResponse,
-  cleanAnswers, aggregate, buildSummaryText, buildInviteText, toCSV, answerText, escapeHtml, templates,
+  cleanAnswers, aggregate, buildSummaryText, buildInviteText, toCSV, answerText, escapeHtml, templates, MAX_QUESTIONS,
 } from "../js/core.js";
 
 const survey = {
@@ -220,4 +220,10 @@ test("파일 조사: 고정 id, 슬러그, 마감 배지", async () => {
   assert.equal(dueLabel({ status: "open", deadlineMs: Date.UTC(2026, 9, 25, 12) }, now).text, "내일 마감");
   assert.equal(dueLabel({ status: "open", deadlineMs: Date.UTC(2026, 9, 28, 12) }, now).text, "D-4");
   assert.equal(dueLabel({ status: "closed" }, now).text, "마감");
+});
+
+test("질문 개수는 규칙의 답 개수 제한을 넘지 않음", () => {
+  const qs = Array.from({ length: MAX_QUESTIONS + 1 }, (_, i) => ({ id: `q${i}`, type: "text", label: `질문 ${i}` }));
+  assert.ok(validateSurvey({ group: "grade", title: "t", questions: qs }).some((e) => e.includes(`${MAX_QUESTIONS}개`)));
+  assert.deepEqual(validateSurvey({ group: "grade", title: "t", questions: qs.slice(1) }), []);
 });
