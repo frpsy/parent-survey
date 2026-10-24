@@ -203,3 +203,21 @@ test("다음 회차: 제목 정리, 마감 7일 단위로 미래로", async () =
   assert.equal(n.status, "open");
   assert.equal(n.deadlineMs, survey.deadlineMs + 7 * 24 * 3600 * 1000);
 });
+
+test("파일 조사: 고정 id, 슬러그, 마감 배지", async () => {
+  const { withStableIds, slugFromFile, dueLabel, parseSurveyText } = await import("../js/core.js");
+  const g = [{ id: "grade", name: "2학년" }];
+  const text = "모임: 2학년\n제목: 김밥\n질문: 품목 | 수량\n- 야채\n- 유부\n질문: 글 | 메모 | 선택";
+  const a = withStableIds(parseSurveyText(text, g).survey, "2026-11-gimbap");
+  const b = withStableIds(parseSurveyText(text, g).survey, "2026-11-gimbap");
+  assert.equal(a.id, "2026-11-gimbap");
+  assert.deepEqual(a.questions.map((q) => q.id), b.questions.map((q) => q.id));
+  assert.deepEqual(a.questions[0].options.map((o) => o.id), b.questions[0].options.map((o) => o.id));
+  assert.notEqual(a.questions[0].options[0].id, a.questions[0].options[1].id);
+  assert.equal(slugFromFile("surveys/2026-11 Gimbap.txt"), "2026-11-gimbap");
+  const now = Date.UTC(2026, 9, 24, 3);
+  assert.equal(dueLabel({ status: "open", deadlineMs: Date.UTC(2026, 9, 24, 12) }, now).text, "오늘 마감");
+  assert.equal(dueLabel({ status: "open", deadlineMs: Date.UTC(2026, 9, 25, 12) }, now).text, "내일 마감");
+  assert.equal(dueLabel({ status: "open", deadlineMs: Date.UTC(2026, 9, 28, 12) }, now).text, "D-4");
+  assert.equal(dueLabel({ status: "closed" }, now).text, "마감");
+});

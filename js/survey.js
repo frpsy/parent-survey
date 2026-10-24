@@ -1,9 +1,9 @@
 import { getSurvey, getMyResponse, saveMyResponse, deleteMyResponse, watchResponses } from "./store.js";
 import {
   escapeHtml, formatDeadline, isOpen, validateResponse, cleanAnswers, ATTEND_CHOICES,
-  answerText, aggregate, won,
+  answerText, aggregate, won, dueLabel,
 } from "./core.js";
-import { $, $$, header, modeBanner, groupName, errorsBox, toast, fail } from "./ui.js";
+import { $, $$, header, modeBanner, groupName, errorsBox, toast, fail, markDone, shareLink, surveyUrl } from "./ui.js";
 
 const root = $("#app");
 const id = new URLSearchParams(location.search).get("id");
@@ -155,24 +155,35 @@ function startBoard(survey) {
   });
 }
 
+let editing = false;
+
 async function render(survey, mine, message = "") {
   const open = isOpen(survey);
+  const due = dueLabel(survey);
+  const showForm = open && (!mine || editing);
   const lastName = mine?.name || (() => { try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; } })();
 
   root.innerHTML = `
     ${header(`<a class="btn small" href="./#${encodeURIComponent(survey.group)}">목록</a>`)}
     ${modeBanner()}
     <div class="card">
-      <div class="meta"><span>${escapeHtml(groupName(survey.group))}</span>
-        <span class="pill ${open ? "" : "closed"}">${open ? "진행 중" : "마감"}</span></div>
+      <div class="meta row"><span>${escapeHtml(groupName(survey.group))}</span>
+        <span class="pill ${due.tone}">${due.text}</span>
+        <span class="spacer"></span>
+        <button class="btn small" id="share" type="button">공유</button></div>
       <h2 style="margin-top:6px">${escapeHtml(survey.title)}</h2>
       ${survey.desc ? `<p style="white-space:pre-line;margin:6px 0 4px">${escapeHtml(survey.desc)}</p>` : ""}
       <div class="meta">마감 ${escapeHtml(formatDeadline(survey.deadlineMs))}</div>
     </div>
     ${message}
+    ${mine && !showForm ? `<div class="card mine">
+      <div class="row"><h3 style="margin:0">내 응답</h3><span class="pill done">응답함</span></div>
+      <div class="stat"><span>이름</span><b>${escapeHtml(mine.name)}</b></div>
+      ${survey.questions.map((q) => { const t = answerText(q, mine.answers?.[q.id]); return t ? `<div class="stat"><span>${escapeHtml(q.label)}</span><span style="text-align:right">${escapeHtml(t)}</span></div>` : ""; }).join("")}
+      ${open ? `<button class="btn block" id="edit" style="margin-top:10px">수정하기</button>` : ""}
+    </div>` : ""}
     <div id="board"></div>
-    ${mine && !message ? `<div class="ok">이미 응답하셨습니다. 아래에서 고친 뒤 다시 저장할 수 있습니다.</div>` : ""}
-    ${open ? `
+    ${showForm ? `
     <form class="card" id="form" novalidate>
       <label class="field" for="name">이름 <span class="req">*</span> <span class="hint">예: 채아아빠, 홍길동(채아맘)</span></label>
       <input type="text" id="name" maxlength="30" autocomplete="nickname" value="${escapeHtml(lastName)}">
@@ -183,11 +194,13 @@ async function render(survey, mine, message = "") {
       <div id="err"></div>
       <button class="btn primary block" type="submit">${mine ? "수정 저장" : "응답 보내기"}</button>
       ${mine ? `<button class="btn danger block" type="button" id="del" style="margin-top:8px">내 응답 취소</button>` : ""}
-    </form>` : `<div class="card">마감된 조사입니다.${mine ? `<br>내 응답: ${survey.questions.map((q) => escapeHtml(answerText(q, mine.answers?.[q.id]))).filter(Boolean).join(" / ")}` : ""}</div>`}
+    </form>` : !open ? `<div class="card sub">마감된 조사입니다.</div>` : ""}
   `;
 
   startBoard(survey);
-  if (!open) return;
+  $("#share").addEventListener("click", () => shareLink(survey.title, surveyUrl(survey.id)));
+  $("#edit")?.addEventListener("click", () => { editing = true; render(survey, mine); });
+  if (!showForm) return;
   bind(survey);
   $("#form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -201,6 +214,8 @@ async function render(survey, mine, message = "") {
     try {
       await saveMyResponse(survey.id, name, cleanAnswers(survey, answers));
       try { localStorage.setItem(NAME_KEY, name); } catch { /* 무시 */ }
+      markDone(survey.id);
+      editing = false;
       const fresh = await getMyResponse(survey.id);
       await render(survey, fresh, `<div class="ok" role="status">응답이 저장되었습니다. 고맙습니다!</div>`);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -213,6 +228,8 @@ async function render(survey, mine, message = "") {
   $("#del")?.addEventListener("click", async () => {
     if (!confirm("내 응답을 취소할까요?")) return;
     await deleteMyResponse(survey.id);
+    markDone(survey.id, false);
+    editing = false;
     toast("응답을 취소했습니다");
     await render(survey, null);
   });
@@ -227,7 +244,9 @@ async function render(survey, mine, message = "") {
       return;
     }
     document.title = `${survey.title} - 학부모 조사함`;
-    await render(survey, await getMyResponse(id));
+    const mine = await getMyResponse(id);
+    if (mine) markDone(id);
+    await render(survey, mine);
   } catch (e) {
     fail(root, e);
   }

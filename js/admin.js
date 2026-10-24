@@ -54,19 +54,33 @@ async function viewList(state) {
       <span class="spacer"></span>
       <a class="btn small" href="#roster/${currentGroup}">${roster.length ? "명단 수정" : "명단 넣기"}</a>
     </div>`}
-    <div class="section-title">조사 ${mine.length}건</div>
-    ${mine.length ? mine.map((s) => `<a class="card" href="#r/${s.id}">
-        <h3>${escapeHtml(s.title)}</h3>
-        <div class="meta">
-          <span class="pill ${isOpen(s) ? "" : "closed"}">${isOpen(s) ? "진행 중" : "마감"}</span>
-          <span>응답 ${counts[s.id]}명</span>
-          <span>마감 ${escapeHtml(formatDeadline(s.deadlineMs))}</span>
-        </div>
-      </a>`).join("") : `<div class="empty">아직 만든 조사가 없습니다.</div>`}
+    <input type="search" class="search" id="q" placeholder="조사 제목 검색" aria-label="조사 제목 검색">
+    <div id="lists"></div>
     <footer><a href="./#${currentGroup}">학부모용 목록 보기</a></footer>
   `;
   bindSignOut();
   $$(".tab").forEach((b) => b.addEventListener("click", () => { currentGroup = b.dataset.g; viewList(state); }));
+  const adminCard = (s) => `<a class="card" href="#r/${s.id}">
+      <h3>${escapeHtml(s.title)}</h3>
+      <div class="meta">
+        <span class="pill ${isOpen(s) ? "" : "closed"}">${isOpen(s) ? "진행 중" : "마감"}</span>
+        <span>응답 ${counts[s.id]}명</span>
+        <span>마감 ${escapeHtml(formatDeadline(s.deadlineMs))}</span>
+        ${s.source === "repo" ? `<span class="pill">파일</span>` : ""}
+      </div>
+    </a>`;
+  const paintLists = () => {
+    const term = $("#q").value.trim();
+    const hit = mine.filter((s) => !term || s.title.includes(term));
+    const op = hit.filter((s) => isOpen(s));
+    const cl = hit.filter((s) => !isOpen(s));
+    $("#lists").innerHTML = `
+      <div class="section-title">진행 중 ${op.length}건</div>
+      ${op.length ? op.map(adminCard).join("") : `<div class="empty">진행 중인 조사가 없습니다.</div>`}
+      ${cl.length ? `<details ${term ? "open" : ""}><summary>마감 ${cl.length}건</summary>${cl.map(adminCard).join("")}</details>` : ""}`;
+  };
+  $("#q").addEventListener("input", paintLists);
+  paintLists();
 }
 
 // ---------- 편집 ----------
@@ -121,6 +135,7 @@ async function viewEdit(state, draft, hasResponses) {
       <a class="btn small" href="${draft.id ? `#r/${draft.id}` : "#"}">← 돌아가기</a>
       <form class="card" id="ed" style="margin-top:12px" novalidate>
         <h3>${draft.id ? "조사 수정" : "새 조사"}</h3>
+        ${draft.source === "repo" ? `<div class="banner">파일(surveys 폴더)로 만든 조사입니다. 여기서 고쳐도 파일이 다시 머지되면 파일 내용으로 덮어씁니다.</div>` : ""}
         ${hasResponses ? `<div class="banner">이미 응답이 있습니다. 항목 이름을 바꾸거나 지우면 그 항목의 기존 응답은 집계에서 빠집니다.</div>` : ""}
         <label class="field">모임</label>
         <select id="group">${groups.map((g) => `<option value="${g.id}" ${draft.group === g.id ? "selected" : ""}>${escapeHtml(g.name)}</option>`).join("")}</select>
