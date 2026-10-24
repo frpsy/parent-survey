@@ -3,7 +3,7 @@ import {
   escapeHtml, formatDeadline, isOpen, validateResponse, cleanAnswers, ATTEND_CHOICES,
   answerText, aggregate, won, dueLabel, buildSummaryText,
 } from "./core.js";
-import { $, $$, header, modeBanner, groupName, errorsBox, toast, fail, markDone, shareLink, surveyUrl, copyText, themeButton } from "./ui.js";
+import { $, $$, header, modeBanner, groupName, errorsBox, toast, fail, shareLink, surveyUrl, copyText, themeButton } from "./ui.js";
 
 const root = $("#app");
 const id = new URLSearchParams(location.search).get("id");
@@ -258,7 +258,6 @@ async function render(survey, mine, message = "") {
     try {
       await saveMyResponse(survey.id, name, cleanAnswers(survey, answers));
       try { localStorage.setItem(NAME_KEY, name); } catch { /* 무시 */ }
-      markDone(survey.id);
       editing = false;
       const fresh = await getMyResponse(survey.id);
       await render(survey, fresh, `<div class="ok" role="status">응답이 저장되었습니다. 고맙습니다!</div>`);
@@ -272,7 +271,6 @@ async function render(survey, mine, message = "") {
   $("#del")?.addEventListener("click", async () => {
     if (!confirm("내 응답을 취소할까요?")) return;
     await deleteMyResponse(survey.id);
-    markDone(survey.id, false);
     editing = false;
     toast("응답을 취소했습니다");
     await render(survey, null);
@@ -289,7 +287,6 @@ async function render(survey, mine, message = "") {
     }
     document.title = `${survey.title} - 학부모 조사함`;
     const mine = await getMyResponse(id);
-    if (mine) markDone(id);
     await render(survey, mine);
   } catch (e) {
     fail(root, e);

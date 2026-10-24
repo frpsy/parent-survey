@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // 학부모 조사함 Firestore 보안 규칙
-// - 조사(surveys): 누구나 읽기, 관리자만 쓰기
+// - 조사(surveys): 링크로 한 건씩 읽기, 목록 조회·쓰기는 관리자만
 // - 응답(responses): 익명 로그인한 본인만 자기 응답 1건을 쓰고 고침(조사가 열려 있을 때만)
 // - 전체 응답 읽기: 관리자, 또는 "결과 공개"로 만든 조사
 // 아래 관리자 이메일을 js/config.js 의 adminEmails 와 똑같이 바꿔 주세요.
@@ -20,7 +20,9 @@ service cloud.firestore {
     }
 
     match /surveys/{surveyId} {
-      allow read: if true;
+      // 링크(id)를 아는 사람만 한 건씩 읽음. 전체 목록은 관리자만
+      allow get: if true;
+      allow list: if isAdmin();
       allow write: if isAdmin();
 
       function survey() {
