@@ -203,7 +203,6 @@ async function render(survey, mine, message = "") {
   root.innerHTML = `
     <div class="hero">
       <div class="top">
-        <a class="btn small" href="./#${encodeURIComponent(survey.group)}">목록</a>
         <span class="pill ${due.tone}">${escapeHtml(groupName(survey.group))} · ${due.text}</span>
         <span class="spacer"></span>
         ${mine && !showForm && open ? `<button class="btn small" id="edit2" type="button">내 응답 수정</button>` : ""}
