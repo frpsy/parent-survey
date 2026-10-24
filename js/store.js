@@ -196,3 +196,33 @@ export async function saveRoster(groupId, households) {
   const f = await initFirebase();
   await f.fs.setDoc(f.fs.doc(f.db, "rosters", groupId), { households, updatedAt: Date.now() });
 }
+
+// ---------- 실시간 응답 구독 (현황판) ----------
+// 응답이 바뀔 때마다 cb(응답 목록)을 부름. 돌려받은 함수를 부르면 구독을 멈춤.
+export function watchResponses(surveyId, cb, onError = () => {}) {
+  if (mode === "local") {
+    let last = "";
+    const emit = () => {
+      const raw = JSON.stringify(lsGet(LS_RESP(surveyId), {}));
+      if (raw === last) return;
+      last = raw;
+      cb(Object.values(JSON.parse(raw)));
+    };
+    emit();
+    const onStorage = (e) => { if (!e.key || e.key === LS_RESP(surveyId)) emit(); };
+    window.addEventListener("storage", onStorage);
+    const t = setInterval(emit, 2000);
+    return () => { window.removeEventListener("storage", onStorage); clearInterval(t); };
+  }
+  let off = () => {};
+  let stopped = false;
+  initFirebase().then((f) => {
+    if (stopped) return;
+    off = f.fs.onSnapshot(
+      f.fs.collection(f.db, "surveys", surveyId, "responses"),
+      (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      onError,
+    );
+  }).catch(onError);
+  return () => { stopped = true; off(); };
+}

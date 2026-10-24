@@ -1,7 +1,7 @@
 import { groups } from "./config.js";
 import {
   mode, adminState, adminSignIn, adminSignOut, listSurveys, getSurvey, saveSurvey, deleteSurvey,
-  listResponses, deleteResponse, getRoster, saveRoster,
+  listResponses, deleteResponse, getRoster, saveRoster, watchResponses,
 } from "./store.js";
 import {
   QUESTION_TYPES, escapeHtml, formatDeadline, isOpen, validateSurvey, parseOptions, optionsToText,
@@ -130,7 +130,7 @@ async function viewEdit(state, draft, hasResponses) {
         <textarea id="desc" maxlength="1000">${escapeHtml(draft.desc || "")}</textarea>
         <label class="field">마감 <span class="hint">비우면 직접 마감할 때까지 받습니다</span></label>
         <input type="datetime-local" id="deadline" value="${toLocalInput(draft.deadlineMs)}">
-        <label class="row" style="margin-top:12px"><input type="checkbox" id="pub" ${draft.publicResults ? "checked" : ""}> 응답자에게 집계와 이름 공개</label>
+        <label class="row" style="margin-top:12px"><input type="checkbox" id="pub" ${draft.publicResults ? "checked" : ""}> 모두에게 실시간 현황판 공개 (이름 포함)</label>
         <div class="section-title">질문</div>
         <div id="qs">${draft.questions.map((q, i) => editorQ(q, i, draft.questions.length)).join("")}</div>
         <div class="row" style="margin:6px 0 4px">
@@ -314,102 +314,120 @@ function resultCard(r) {
   return `<div class="card"><h3>${escapeHtml(r.q.label)}</h3><div class="sub" style="margin-bottom:6px">${r.answered}명 응답</div>${body}</div>`;
 }
 
+let stopLive = null;
+function stopLiveWatch() { if (stopLive) { stopLive(); stopLive = null; } }
+
 async function viewResult(state, id) {
+  stopLiveWatch();
   const survey = await getSurvey(id);
   if (!survey) { root.innerHTML = `${header(signOutBtn(state))}<div class="card">조사를 찾을 수 없습니다. <a href="#">목록</a></div>`; bindSignOut(); return; }
-  const responses = await listResponses(id);
   currentGroup = survey.group;
   let roster = [];
   try { roster = await getRoster(survey.group); } catch { /* 무시 */ }
-  const rm = roster.length ? matchRoster(roster, responses) : null;
-  const open = isOpen(survey);
-  const url = surveyUrl(id);
-  const gName = groupName(survey.group);
+  const paint = (responses) => {
+    const rm = roster.length ? matchRoster(roster, responses) : null;
+    const open = isOpen(survey);
+    const url = surveyUrl(id);
+    const gName = groupName(survey.group);
 
-  root.innerHTML = `
-    ${header(signOutBtn(state))}
-    ${modeBanner()}
-    <a class="btn small" href="#">← 목록</a>
-    <div class="card" style="margin-top:12px">
-      <div class="meta"><span>${escapeHtml(gName)}</span><span class="pill ${open ? "" : "closed"}">${open ? "진행 중" : "마감"}</span></div>
-      <h2 style="margin-top:6px">${escapeHtml(survey.title)}</h2>
-      <div class="meta"><span>응답 ${responses.length}명</span><span>마감 ${escapeHtml(formatDeadline(survey.deadlineMs))}</span></div>
-      <div class="row" style="margin-top:12px">
-        <button class="btn small primary" id="invite">카톡 공지 복사</button>
-        <button class="btn small primary" id="summary">결과 요약 복사</button>
-        <button class="btn small" id="link">링크 복사</button>
-        <button class="btn small" id="csv">엑셀(CSV) 받기</button>
+    root.innerHTML = `
+      ${header(signOutBtn(state))}
+      ${modeBanner()}
+      <a class="btn small" href="#">← 목록</a>
+      <div class="card" style="margin-top:12px">
+        <div class="meta"><span>${escapeHtml(gName)}</span><span class="pill ${open ? "" : "closed"}">${open ? "진행 중" : "마감"}</span></div>
+        <h2 style="margin-top:6px">${escapeHtml(survey.title)}</h2>
+        <div class="meta"><span>응답 ${responses.length}명</span><span>마감 ${escapeHtml(formatDeadline(survey.deadlineMs))}</span><span class="pill">실시간</span></div>
+      <div class="row" style="margin-top:10px">
+        <span class="sub">현황판: ${survey.publicResults ? "모두에게 공개 중" : "관리자만 보기"}</span>
+        <button class="btn small" id="pubtoggle">${survey.publicResults ? "비공개로" : "모두에게 공개"}</button>
       </div>
-      <div class="row" style="margin-top:8px">
-        <a class="btn small" href="#edit/${id}">수정</a>
-        <button class="btn small" id="toggle">${survey.status === "open" ? "지금 마감" : "다시 열기"}</button>
-        <button class="btn small" id="dup">다음 회차로 복제</button>
-        <button class="btn small" id="astext">문안 복사</button>
-        <a class="btn small" href="${escapeHtml(url)}" target="_blank" rel="noopener">응답 화면</a>
-        <span class="spacer"></span>
-        <button class="btn small danger" id="del">삭제</button>
+        <div class="row" style="margin-top:12px">
+          <button class="btn small primary" id="invite">카톡 공지 복사</button>
+          <button class="btn small primary" id="summary">결과 요약 복사</button>
+          <button class="btn small" id="link">링크 복사</button>
+          <button class="btn small" id="csv">엑셀(CSV) 받기</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <a class="btn small" href="#edit/${id}">수정</a>
+          <button class="btn small" id="toggle">${survey.status === "open" ? "지금 마감" : "다시 열기"}</button>
+          <button class="btn small" id="dup">다음 회차로 복제</button>
+          <button class="btn small" id="astext">문안 복사</button>
+          <a class="btn small" href="${escapeHtml(url)}" target="_blank" rel="noopener">응답 화면</a>
+          <span class="spacer"></span>
+          <button class="btn small danger" id="del">삭제</button>
+        </div>
       </div>
-    </div>
-    ${rm ? `<div class="card">
-      <h3>응답 가정 ${rm.answered.length} / ${rm.total}</h3>
-      ${rm.missing.length ? `<div class="stat"><span>미응답</span><span style="text-align:right">${rm.missing.map(escapeHtml).join(", ")}</span></div>` : `<div class="ok">모든 가정이 응답했습니다.</div>`}
-      ${rm.unknown.length ? `<div class="stat"><span>명단과 안 맞는 이름</span><span style="text-align:right">${rm.unknown.map(escapeHtml).join(", ")}</span></div>` : ""}
-      ${rm.missing.length && open ? `<button class="btn small" id="remind" style="margin-top:8px">미응답 안내 복사</button>` : ""}
-    </div>` : groups.find((g) => g.id === survey.group)?.roster === false ? "" : `<div class="card sub">명단을 넣으면 미응답 가정을 볼 수 있습니다. <a href="#roster/${escapeHtml(survey.group)}">명단 넣기</a></div>`}
-    ${responses.length ? aggregate(survey, responses).map(resultCard).join("") : `<div class="empty">아직 응답이 없습니다. 카톡 공지를 복사해 단톡방에 올려 보세요.</div>`}
-    ${responses.length ? `<div class="card"><h3>응답자 ${responses.length}명</h3>
-      <div class="table-scroll"><table class="list">
-        <thead><tr><th>이름</th>${survey.questions.map((q) => `<th>${escapeHtml(q.label)}</th>`).join("")}<th></th></tr></thead>
-        <tbody>${sortByName(responses).map((r) => `<tr><td>${escapeHtml(r.name)}</td>${survey.questions.map((q) => `<td>${escapeHtml(answerText(q, r.answers?.[q.id]))}</td>`).join("")}<td><button class="btn small danger" data-delr="${escapeHtml(r.id)}" aria-label="${escapeHtml(r.name)} 응답 삭제">삭제</button></td></tr>`).join("")}</tbody>
-      </table></div></div>` : ""}
-  `;
-  bindSignOut();
+      ${rm ? `<div class="card">
+        <h3>응답 가정 ${rm.answered.length} / ${rm.total}</h3>
+        ${rm.missing.length ? `<div class="stat"><span>미응답</span><span style="text-align:right">${rm.missing.map(escapeHtml).join(", ")}</span></div>` : `<div class="ok">모든 가정이 응답했습니다.</div>`}
+        ${rm.unknown.length ? `<div class="stat"><span>명단과 안 맞는 이름</span><span style="text-align:right">${rm.unknown.map(escapeHtml).join(", ")}</span></div>` : ""}
+        ${rm.missing.length && open ? `<button class="btn small" id="remind" style="margin-top:8px">미응답 안내 복사</button>` : ""}
+      </div>` : groups.find((g) => g.id === survey.group)?.roster === false ? "" : `<div class="card sub">명단을 넣으면 미응답 가정을 볼 수 있습니다. <a href="#roster/${escapeHtml(survey.group)}">명단 넣기</a></div>`}
+      ${responses.length ? aggregate(survey, responses).map(resultCard).join("") : `<div class="empty">아직 응답이 없습니다. 카톡 공지를 복사해 단톡방에 올려 보세요.</div>`}
+      ${responses.length ? `<div class="card"><h3>응답자 ${responses.length}명</h3>
+        <div class="table-scroll"><table class="list">
+          <thead><tr><th>이름</th>${survey.questions.map((q) => `<th>${escapeHtml(q.label)}</th>`).join("")}<th></th></tr></thead>
+          <tbody>${sortByName(responses).map((r) => `<tr><td>${escapeHtml(r.name)}</td>${survey.questions.map((q) => `<td>${escapeHtml(answerText(q, r.answers?.[q.id]))}</td>`).join("")}<td><button class="btn small danger" data-delr="${escapeHtml(r.id)}" aria-label="${escapeHtml(r.name)} 응답 삭제">삭제</button></td></tr>`).join("")}</tbody>
+        </table></div></div>` : ""}
+    `;
+    bindSignOut();
 
-  $("#invite").addEventListener("click", () => copyText(buildInviteText(survey, url, gName), "카톡 공지를 복사했습니다"));
-  $("#summary").addEventListener("click", () => copyText(buildSummaryText(survey, responses, gName, roster), "결과 요약을 복사했습니다"));
-  $("#remind")?.addEventListener("click", () => copyText(buildReminderText(survey, url, rm.missing), "미응답 안내를 복사했습니다"));
-  $("#link").addEventListener("click", () => copyText(url, "링크를 복사했습니다"));
-  $("#csv").addEventListener("click", () => {
-    const blob = new Blob([toCSV(survey, responses)], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${survey.title.replace(/[\\/:*?"<>|]/g, "_")}.csv`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  });
-  $("#toggle").addEventListener("click", async () => {
-    const next = { ...survey, status: survey.status === "open" ? "closed" : "open" };
-    if (next.status === "open" && next.deadlineMs && next.deadlineMs <= Date.now()) {
-      if (!confirm("마감 시각이 지났습니다. 마감 시각을 지우고 다시 열까요?")) return;
-      next.deadlineMs = null;
-    }
-    await saveSurvey(next);
-    toast(next.status === "open" ? "다시 열었습니다" : "마감했습니다");
-    viewResult(state, id);
-  });
-  $("#dup").addEventListener("click", async () => {
-    const draft = nextRound(survey);
-    if (!draft.deadlineMs) draft.deadlineMs = defaultDeadline();
-    const copy = await saveSurvey(draft);
-    toast("복제했습니다");
-    location.hash = `#edit/${copy.id}`;
-  });
-  $("#astext").addEventListener("click", () => copyText(surveyToText(survey, groups), "조사 문안을 복사했습니다"));
-  $("#del").addEventListener("click", async () => {
-    if (!confirm(`"${survey.title}" 조사와 응답 ${responses.length}건을 모두 지울까요? 되돌릴 수 없습니다.`)) return;
-    await deleteSurvey(id);
-    toast("삭제했습니다");
-    location.hash = "#";
-  });
-  $$("[data-delr]").forEach((b) => b.addEventListener("click", async () => {
-    if (!confirm("이 응답을 삭제할까요?")) return;
-    await deleteResponse(id, b.dataset.delr);
-    viewResult(state, id);
-  }));
+    $("#invite").addEventListener("click", () => copyText(buildInviteText(survey, url, gName), "카톡 공지를 복사했습니다"));
+    $("#summary").addEventListener("click", () => copyText(buildSummaryText(survey, responses, gName, roster), "결과 요약을 복사했습니다"));
+    $("#remind")?.addEventListener("click", () => copyText(buildReminderText(survey, url, rm.missing), "미응답 안내를 복사했습니다"));
+    $("#link").addEventListener("click", () => copyText(url, "링크를 복사했습니다"));
+    $("#csv").addEventListener("click", () => {
+      const blob = new Blob([toCSV(survey, responses)], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${survey.title.replace(/[\\/:*?"<>|]/g, "_")}.csv`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+    $("#toggle").addEventListener("click", async () => {
+      const next = { ...survey, status: survey.status === "open" ? "closed" : "open" };
+      if (next.status === "open" && next.deadlineMs && next.deadlineMs <= Date.now()) {
+        if (!confirm("마감 시각이 지났습니다. 마감 시각을 지우고 다시 열까요?")) return;
+        next.deadlineMs = null;
+      }
+      await saveSurvey(next);
+      toast(next.status === "open" ? "다시 열었습니다" : "마감했습니다");
+      viewResult(state, id);
+    });
+    $("#dup").addEventListener("click", async () => {
+      const draft = nextRound(survey);
+      if (!draft.deadlineMs) draft.deadlineMs = defaultDeadline();
+      const copy = await saveSurvey(draft);
+      toast("복제했습니다");
+      location.hash = `#edit/${copy.id}`;
+    });
+    $("#pubtoggle").addEventListener("click", async () => {
+      survey.publicResults = !survey.publicResults;
+      await saveSurvey(survey);
+      toast(survey.publicResults ? "현황판을 공개했습니다" : "현황판을 비공개로 바꿨습니다");
+      paint(responses);
+    });
+    $("#astext").addEventListener("click", () => copyText(surveyToText(survey, groups), "조사 문안을 복사했습니다"));
+    $("#del").addEventListener("click", async () => {
+      if (!confirm(`"${survey.title}" 조사와 응답 ${responses.length}건을 모두 지울까요? 되돌릴 수 없습니다.`)) return;
+      stopLiveWatch();
+      await deleteSurvey(id);
+      toast("삭제했습니다");
+      location.hash = "#";
+    });
+    $$("[data-delr]").forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm("이 응답을 삭제할까요?")) return;
+      await deleteResponse(id, b.dataset.delr);
+      toast("응답을 삭제했습니다");
+    }));
+  };
+  stopLive = watchResponses(id, paint, (e) => { console.error(e); toast("실시간 연결이 끊겼습니다. 새로고침해 주세요"); });
 }
 
 // ---------- 라우팅 ----------
 async function route() {
+  stopLiveWatch();
   try {
     const state = await adminState();
     if (!state.isAdmin) {
@@ -435,7 +453,7 @@ async function route() {
     if (view === "new") {
       const group = groups.some((g) => g.id === a) ? a : currentGroup;
       const tpl = templates()[b] || { title: "", desc: "", questions: [{ id: newId(6), type: "attend", label: "참석 여부", required: true, options: [] }] };
-      return viewEdit(state, { ...tpl, group, status: "open", deadlineMs: defaultDeadline(), publicResults: false }, false);
+      return viewEdit(state, { ...tpl, group, status: "open", deadlineMs: defaultDeadline(), publicResults: true }, false);
     }
     if (view === "edit" && a) {
       const s = await getSurvey(a);

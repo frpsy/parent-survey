@@ -427,7 +427,7 @@ function kstDateText(ms) {
 
 export function parseSurveyText(text, groupList = []) {
   const errors = [];
-  const s = { title: "", desc: "", group: "", deadlineMs: null, publicResults: false, status: "open", questions: [] };
+  const s = { title: "", desc: "", group: "", deadlineMs: null, publicResults: true, status: "open", questions: [] };
   let last = null; // 마지막으로 연 필드: "desc" 또는 질문 객체
   String(text || "").replace(/\r/g, "").split("\n").forEach((raw, idx) => {
     const line = raw.trim();
@@ -449,7 +449,7 @@ export function parseSurveyText(text, groupList = []) {
           if (ms === undefined) errors.push(`${n}줄: 마감은 2026-11-04 21:00 형식으로 써 주세요.`);
           else s.deadlineMs = ms;
         }
-      } else if (key === "결과공개") s.publicResults = /^(예|네|공개|o|yes|true)$/i.test(val.trim());
+      } else if (key === "결과공개") s.publicResults = !/^(아니오|아니요|비공개|x|no|false)$/i.test(val.trim());
       else if (key === "질문") {
         const parts = val.split("|").map((x) => x.trim());
         const type = TEXT_TYPES[parts[0]];
