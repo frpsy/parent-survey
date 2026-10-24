@@ -14,6 +14,11 @@ service cloud.firestore {
         && request.auth.token.email in ['YOUR_EMAIL@gmail.com'];
     }
 
+    // 학부모 명단: 관리자만 (공개 사이트에서 읽히지 않음)
+    match /rosters/{groupId} {
+      allow read, write: if isAdmin();
+    }
+
     match /surveys/{surveyId} {
       allow read: if true;
       allow write: if isAdmin();

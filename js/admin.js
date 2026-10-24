@@ -1,12 +1,12 @@
 import { groups } from "./config.js";
 import {
   mode, adminState, adminSignIn, adminSignOut, listSurveys, getSurvey, saveSurvey, deleteSurvey,
-  listResponses, deleteResponse,
+  listResponses, deleteResponse, getRoster, saveRoster,
 } from "./store.js";
 import {
   QUESTION_TYPES, escapeHtml, formatDeadline, isOpen, validateSurvey, parseOptions, optionsToText,
   mergeOptionIds, templates, newId, aggregate, answerText, buildInviteText, buildSummaryText, toCSV,
-  won, sortByName,
+  won, sortByName, parseRoster, rosterToText, matchRoster, buildReminderText,
 } from "./core.js";
 import { $, $$, header, modeBanner, groupName, errorsBox, toast, copyText, surveyUrl, fail } from "./ui.js";
 
@@ -28,6 +28,8 @@ async function viewList(state) {
     try { counts[s.id] = (await listResponses(s.id)).length; } catch { counts[s.id] = "?"; }
   }));
   const mine = surveys.filter((s) => s.group === currentGroup).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  let roster = [];
+  try { roster = await getRoster(currentGroup); } catch { /* 무시 */ }
 
   root.innerHTML = `
     ${header(signOutBtn(state))}
@@ -44,6 +46,11 @@ async function viewList(state) {
         <a class="btn small" href="#new/${currentGroup}/picnic">야유회 참석 인원</a>
         <a class="btn small primary" href="#new/${currentGroup}/blank">빈 양식</a>
       </div>
+    </div>
+    <div class="card row">
+      <div><b>학부모 명단</b> <span class="sub">${roster.length ? `${roster.length}가정` : "아직 없음"} · 관리자만 봅니다</span></div>
+      <span class="spacer"></span>
+      <a class="btn small" href="#roster/${currentGroup}">${roster.length ? "명단 수정" : "명단 넣기"}</a>
     </div>
     <div class="section-title">조사 ${mine.length}건</div>
     ${mine.length ? mine.map((s) => `<a class="card" href="#r/${s.id}">
@@ -217,6 +224,39 @@ async function viewEdit(state, draft, hasResponses) {
   paint();
 }
 
+// ---------- 명단 ----------
+async function viewRoster(state, groupId) {
+  currentGroup = groupId;
+  const roster = await getRoster(groupId);
+  root.innerHTML = `
+    ${header(signOutBtn(state))}
+    ${modeBanner()}
+    <a class="btn small" href="#">← 목록</a>
+    <form class="card" id="rf" style="margin-top:12px">
+      <h3>${escapeHtml(groupName(groupId))} 학부모 명단</h3>
+      <p class="sub">한 줄에 한 가정씩 아이 이름만 적어 주세요. 쌍둥이·형제는 한 줄에 쉼표로 씁니다. 응답 이름에 아이 이름이 들어 있으면(예: 채아아빠) 응답한 가정으로 셉니다.</p>
+      <p class="sub">연락처·생년월일은 넣지 마세요. 명단은 관리자 화면에서만 보입니다.</p>
+      <textarea id="rt" style="min-height:280px" placeholder="채아&#10;정인, 현겸">${escapeHtml(rosterToText(roster))}</textarea>
+      <div class="sub" id="rc" style="margin:6px 0 10px"></div>
+      <button class="btn primary block" type="submit">저장</button>
+    </form>`;
+  bindSignOut();
+  const count = () => { $("#rc").textContent = `${parseRoster($("#rt").value).length}가정`; };
+  $("#rt").addEventListener("input", count);
+  count();
+  $("#rf").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await saveRoster(groupId, parseRoster($("#rt").value));
+      toast("명단을 저장했습니다");
+      location.hash = "#";
+    } catch (err) {
+      console.error(err);
+      toast("저장하지 못했습니다");
+    }
+  });
+}
+
 // ---------- 결과 ----------
 function resultCard(r) {
   const unit = escapeHtml(r.q.unit || "");
@@ -250,6 +290,9 @@ async function viewResult(state, id) {
   if (!survey) { root.innerHTML = `${header(signOutBtn(state))}<div class="card">조사를 찾을 수 없습니다. <a href="#">목록</a></div>`; bindSignOut(); return; }
   const responses = await listResponses(id);
   currentGroup = survey.group;
+  let roster = [];
+  try { roster = await getRoster(survey.group); } catch { /* 무시 */ }
+  const rm = roster.length ? matchRoster(roster, responses) : null;
   const open = isOpen(survey);
   const url = surveyUrl(id);
   const gName = groupName(survey.group);
@@ -277,6 +320,12 @@ async function viewResult(state, id) {
         <button class="btn small danger" id="del">삭제</button>
       </div>
     </div>
+    ${rm ? `<div class="card">
+      <h3>응답 가정 ${rm.answered.length} / ${rm.total}</h3>
+      ${rm.missing.length ? `<div class="stat"><span>미응답</span><span style="text-align:right">${rm.missing.map(escapeHtml).join(", ")}</span></div>` : `<div class="ok">모든 가정이 응답했습니다.</div>`}
+      ${rm.unknown.length ? `<div class="stat"><span>명단과 안 맞는 이름</span><span style="text-align:right">${rm.unknown.map(escapeHtml).join(", ")}</span></div>` : ""}
+      ${rm.missing.length && open ? `<button class="btn small" id="remind" style="margin-top:8px">미응답 안내 복사</button>` : ""}
+    </div>` : `<div class="card sub">명단을 넣으면 미응답 가정을 볼 수 있습니다. <a href="#roster/${escapeHtml(survey.group)}">명단 넣기</a></div>`}
     ${responses.length ? aggregate(survey, responses).map(resultCard).join("") : `<div class="empty">아직 응답이 없습니다. 카톡 공지를 복사해 단톡방에 올려 보세요.</div>`}
     ${responses.length ? `<div class="card"><h3>응답자 ${responses.length}명</h3>
       <div class="table-scroll"><table class="list">
@@ -287,7 +336,8 @@ async function viewResult(state, id) {
   bindSignOut();
 
   $("#invite").addEventListener("click", () => copyText(buildInviteText(survey, url, gName), "카톡 공지를 복사했습니다"));
-  $("#summary").addEventListener("click", () => copyText(buildSummaryText(survey, responses, gName), "결과 요약을 복사했습니다"));
+  $("#summary").addEventListener("click", () => copyText(buildSummaryText(survey, responses, gName, roster), "결과 요약을 복사했습니다"));
+  $("#remind")?.addEventListener("click", () => copyText(buildReminderText(survey, url, rm.missing), "미응답 안내를 복사했습니다"));
   $("#link").addEventListener("click", () => copyText(url, "링크를 복사했습니다"));
   $("#csv").addEventListener("click", () => {
     const blob = new Blob([toCSV(survey, responses)], { type: "text/csv;charset=utf-8" });
@@ -363,6 +413,7 @@ async function route() {
       return viewEdit(state, JSON.parse(JSON.stringify(s)), n > 0);
     }
     if (view === "r" && a) return viewResult(state, a);
+    if (view === "roster" && groups.some((g) => g.id === a)) return viewRoster(state, a);
     return viewList(state);
   } catch (e) {
     fail(root, e);
