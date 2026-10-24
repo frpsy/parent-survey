@@ -1,9 +1,9 @@
 import { getSurvey, getMyResponse, saveMyResponse, deleteMyResponse, watchResponses } from "./store.js";
 import {
   escapeHtml, formatDeadline, isOpen, validateResponse, cleanAnswers, ATTEND_CHOICES,
-  answerText, aggregate, won, dueLabel,
+  answerText, aggregate, won, dueLabel, buildSummaryText,
 } from "./core.js";
-import { $, $$, header, modeBanner, groupName, errorsBox, toast, fail, markDone, shareLink, surveyUrl } from "./ui.js";
+import { $, $$, header, modeBanner, groupName, errorsBox, toast, fail, markDone, shareLink, surveyUrl, copyText } from "./ui.js";
 
 const root = $("#app");
 const id = new URLSearchParams(location.search).get("id");
@@ -23,14 +23,14 @@ function qInput(q, a) {
       </div>${head}`;
     }
     case "items":
-      return q.options.map((o) => `<div class="item-row">
-        <div>${escapeHtml(o.label)}${o.price ? ` <span class="hint">${won(o.price)}</span>` : ""}</div>
-        <div class="stepper">
-          <button type="button" class="btn small" data-step="-1" aria-label="${escapeHtml(o.label)} 줄이기">−</button>
+      return q.options.map((o) => `<div class="menu-item ${(a?.[o.id] || 0) > 0 ? "on" : ""}">
+        <div><div style="font-weight:600">${escapeHtml(o.label)}</div>${o.price ? `<div class="price">${won(o.price)}</div>` : ""}</div>
+        <div class="stepper row" style="gap:0;flex-wrap:nowrap">
+          <button type="button" data-step="-1" aria-label="${escapeHtml(o.label)} 줄이기">−</button>
           <input type="number" min="0" max="999" inputmode="numeric" data-item="${o.id}" value="${escapeHtml(a?.[o.id] || 0)}" aria-label="${escapeHtml(o.label)} 수량">
-          <button type="button" class="btn small" data-step="1" aria-label="${escapeHtml(o.label)} 늘리기">+</button>
+          <button type="button" data-step="1" aria-label="${escapeHtml(o.label)} 늘리기">+</button>
         </div>
-      </div>`).join("") + `<div class="hint" data-total></div>`;
+      </div>`).join("");
     case "count":
       return `<div class="row"><input type="number" name="${name}" min="0" inputmode="numeric" style="max-width:140px" value="${escapeHtml(a ?? "")}"> <span>${escapeHtml(q.unit || "")}</span></div>`;
     case "choice":
@@ -87,8 +87,8 @@ function itemTotal(q, box) {
     const o = q.options.find((x) => x.id === i.dataset.item);
     if (o?.price) sum += n * o.price;
   });
-  const t = $("[data-total]", box);
-  if (t) t.textContent = qty ? `합계 ${qty}${q.unit || ""}${sum ? ` · ${won(sum)}` : ""}` : "";
+  $$(".menu-item", box).forEach((m) => m.classList.toggle("on", Number($("input", m).value) > 0));
+  updateBar();
 }
 
 function bind(survey) {
@@ -111,33 +111,65 @@ function bind(survey) {
   }
 }
 
+const ICON = {
+  list: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+  user: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
+  board: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6"/></svg>',
+  check: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12l5 5L20 7"/></svg>',
+};
+const AV = ["#f0712a", "#1f9e5a", "#3b7dd8", "#a654c9", "#d4448a", "#2a9d9b"];
+function avatar(name) {
+  let h = 0;
+  for (const ch of String(name)) h = (h * 31 + ch.codePointAt(0)) >>> 0;
+  return `<span class="avatar" style="background:${AV[h % AV.length]}">${escapeHtml(Array.from(String(name).trim())[0] || "?")}</span>`;
+}
+
 // 모두가 보는 실시간 현황판 (자유 입력 답은 보여 주지 않음)
+let lastResponses = [];
 function liveBoard(survey, responses) {
+  lastResponses = responses;
   const res = aggregate(survey, responses);
-  const t = new Date();
-  const hhmm = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
   const unitOf = (q) => escapeHtml(q.unit || "");
   const blocks = res.map((r) => {
-    let body = "";
     if (r.q.type === "items") {
-      body = `<div class="stat"><span>합계</span><b class="big">${r.totalQty}${unitOf(r.q)}</b></div>`
-        + r.rows.map((x) => `<div class="stat"><span>${escapeHtml(x.label)}</span><b>${x.qty}${unitOf(r.q)}${x.price ? ` · ${won(x.price)}` : ""}</b></div>`).join("")
-        + (r.totalPrice ? `<div class="stat"><span>금액 합계</span><b>${won(r.totalPrice)}</b></div>` : "")
-        + (r.perPerson.length ? `<details open><summary>누가 얼마나 (${r.perPerson.length}명)</summary>${r.perPerson.map((p) => `<div class="stat"><span>${escapeHtml(p.name)}</span><span style="text-align:right">${escapeHtml(p.text)}</span></div>`).join("")}</details>` : "");
-    } else if (r.q.type === "attend" || r.q.type === "choice" || r.q.type === "multi") {
-      body = r.rows.map((x) => `<div class="stat"><span>${escapeHtml(x.label)}</span><b>${x.count}${r.q.type === "attend" ? "가정" : ""}${r.q.type === "attend" && r.q.headcount && x.label === "참석" ? ` · 총 ${x.people}명` : ""}</b></div>${x.names?.length ? `<div class="names">${x.names.map(escapeHtml).join(", ")}</div>` : ""}`).join("");
-    } else if (r.q.type === "count") {
-      body = `<div class="stat"><span>합계</span><b class="big">${r.total}${unitOf(r.q)}</b></div>`
-        + r.list.map((x) => `<div class="stat"><span>${escapeHtml(x.name)}</span><span>${escapeHtml(x.value)}${unitOf(r.q)}</span></div>`).join("");
-    } else {
-      return "";
+      return `${res.length > 1 ? `<div class="q-label">${escapeHtml(r.q.label)}</div>` : ""}
+        ${r.rows.map((x) => `<div class="stat"><span>${escapeHtml(x.label)}</span><span><b>${x.qty}${unitOf(r.q)}</b>${x.price ? ` <span class="sub">${won(x.price)}</span>` : ""}</span></div>`).join("")}
+        <div class="tot"><span>총 ${r.perPerson.length}명 · ${r.totalQty}${unitOf(r.q)}</span><span class="amt">${r.totalPrice ? won(r.totalPrice) : `${r.totalQty}${unitOf(r.q)}`}</span></div>
+        ${r.perPerson.map((p) => `<div class="person">${avatar(p.name)}<div class="who"><div class="row1"><span>${escapeHtml(p.name)}</span>${p.sum ? `<span>${won(p.sum)}</span>` : ""}</div><div class="what">${escapeHtml(p.text)}</div></div></div>`).join("")}`;
     }
-    return `<div class="q"><div class="q-label">${escapeHtml(r.q.label)}</div>${body}</div>`;
+    if (r.q.type === "attend" || r.q.type === "choice" || r.q.type === "multi") {
+      return `<div class="q"><div class="q-label">${escapeHtml(r.q.label)}</div>${r.rows.map((x) => `<div class="stat"><span>${escapeHtml(x.label)}</span><b>${x.count}${r.q.type === "attend" ? "가정" : ""}${r.q.type === "attend" && r.q.headcount && x.label === "참석" ? ` · 총 ${x.people}명` : ""}</b></div>${x.names?.length ? `<div class="names">${x.names.map(escapeHtml).join(", ")}</div>` : ""}`).join("")}</div>`;
+    }
+    if (r.q.type === "count") {
+      return `<div class="q"><div class="q-label">${escapeHtml(r.q.label)}</div><div class="tot"><span>합계</span><span class="amt">${r.total}${unitOf(r.q)}</span></div>${r.list.map((x) => `<div class="stat"><span>${escapeHtml(x.name)}</span><span>${escapeHtml(x.value)}${unitOf(r.q)}</span></div>`).join("")}</div>`;
+    }
+    return "";
   }).join("");
   return `<div class="card">
-    <div class="row"><h3 style="margin:0">실시간 현황</h3><span class="pill">${responses.length}명 응답</span><span class="spacer"></span><span class="sub">${hhmm} 갱신</span></div>
+    <div class="sec-h">${ICON.board}전체 현황 <span class="live-dot">실시간 · ${responses.length}명</span></div>
     ${responses.length ? blocks : `<div class="empty" style="padding:16px 0">아직 응답이 없습니다. 첫 응답을 남겨 주세요.</div>`}
+    ${responses.length ? `<button class="btn kakao block" id="kakao" type="button" style="margin-top:14px">카톡 공유용 요약 복사</button>` : ""}
   </div>`;
+}
+
+// 아래 고정 바: 지금 고른 내용과 금액
+function updateBar() {
+  const bar = $("#barsum");
+  if (!bar || !currentSurvey) return;
+  const answers = readAnswers(currentSurvey);
+  let total = 0;
+  const parts = [];
+  for (const q of currentSurvey.questions) {
+    const a = answers[q.id];
+    if (q.type === "items" && a) {
+      for (const o of q.options) if (a[o.id] > 0) { parts.push(`${o.label} ${a[o.id]}`); if (o.price) total += a[o.id] * o.price; }
+    } else if (q.type !== "text") {
+      const t = answerText(q, a);
+      if (t) parts.push(t);
+    }
+  }
+  const hasPrice = currentSurvey.questions.some((q) => q.type === "items" && q.options.some((o) => o.price));
+  bar.innerHTML = `<small>${parts.length ? escapeHtml(parts.join(", ")) : "아직 고른 내용이 없습니다"}</small><b>${hasPrice ? won(total) : `${parts.length ? "선택 완료" : "　"}`}</b>`;
 }
 
 let stopBoard = null;
@@ -148,7 +180,9 @@ function startBoard(survey) {
   el.innerHTML = `<div class="card sub">현황을 불러오는 중…</div>`;
   stopBoard = watchResponses(survey.id, (responses) => {
     const box = $("#board");
-    if (box) box.innerHTML = liveBoard(survey, responses);
+    if (!box) return;
+    box.innerHTML = liveBoard(survey, responses);
+    $("#kakao", box)?.addEventListener("click", () => copyText(buildSummaryText(survey, lastResponses, groupName(survey.group)), "요약을 복사했습니다. 카톡에 붙여 넣으세요"));
   }, () => {
     const box = $("#board");
     if (box) box.innerHTML = "";
@@ -156,6 +190,7 @@ function startBoard(survey) {
 }
 
 let editing = false;
+let currentSurvey = null;
 
 async function render(survey, mine, message = "") {
   const open = isOpen(survey);
@@ -163,45 +198,60 @@ async function render(survey, mine, message = "") {
   const showForm = open && (!mine || editing);
   const lastName = mine?.name || (() => { try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; } })();
 
+  currentSurvey = survey;
+  document.body.classList.toggle("has-bar", showForm);
   root.innerHTML = `
-    ${header(`<a class="btn small" href="./#${encodeURIComponent(survey.group)}">목록</a>`)}
-    ${modeBanner()}
-    <div class="card">
-      <div class="meta row"><span>${escapeHtml(groupName(survey.group))}</span>
-        <span class="pill ${due.tone}">${due.text}</span>
+    <div class="hero">
+      <div class="top">
+        <a class="btn small" href="./#${encodeURIComponent(survey.group)}">목록</a>
+        <span class="pill ${due.tone}">${escapeHtml(groupName(survey.group))} · ${due.text}</span>
         <span class="spacer"></span>
-        <button class="btn small" id="share" type="button">공유</button></div>
-      <h2 style="margin-top:6px">${escapeHtml(survey.title)}</h2>
-      ${survey.desc ? `<p style="white-space:pre-line;margin:6px 0 4px">${escapeHtml(survey.desc)}</p>` : ""}
-      <div class="meta">마감 ${escapeHtml(formatDeadline(survey.deadlineMs))}</div>
+        ${mine && !showForm && open ? `<button class="btn small" id="edit2" type="button">내 응답 수정</button>` : ""}
+        <button class="btn small" id="share" type="button">공유</button>
+      </div>
+      <h1>${escapeHtml(survey.title)}</h1>
+      ${survey.desc ? `<p>${escapeHtml(survey.desc)}</p>` : ""}
+      <div class="meta" style="margin-top:6px">마감 ${escapeHtml(formatDeadline(survey.deadlineMs))}</div>
     </div>
+    ${modeBanner()}
     ${message}
     ${mine && !showForm ? `<div class="card mine">
-      <div class="row"><h3 style="margin:0">내 응답</h3><span class="pill done">응답함</span></div>
+      <div class="sec-h">${ICON.check}내 응답</div>
       <div class="stat"><span>이름</span><b>${escapeHtml(mine.name)}</b></div>
       ${survey.questions.map((q) => { const t = answerText(q, mine.answers?.[q.id]); return t ? `<div class="stat"><span>${escapeHtml(q.label)}</span><span style="text-align:right">${escapeHtml(t)}</span></div>` : ""; }).join("")}
       ${open ? `<button class="btn block" id="edit" style="margin-top:10px">수정하기</button>` : ""}
     </div>` : ""}
-    <div id="board"></div>
     ${showForm ? `
-    <form class="card" id="form" novalidate>
-      <label class="field" for="name">이름 <span class="req">*</span> <span class="hint">예: 채아아빠, 홍길동(채아맘)</span></label>
-      <input type="text" id="name" maxlength="30" autocomplete="nickname" value="${escapeHtml(lastName)}">
-      ${survey.questions.map((q, i) => `<div class="q" data-q="${q.id}">
-        <div class="q-label">${i + 1}. ${escapeHtml(q.label)}${q.required ? `<span class="req">*</span>` : ""}</div>
+    <form id="form" novalidate>
+      ${survey.questions.map((q, i) => `<div class="card" data-q="${q.id}">
+        <div class="sec-h">${q.type === "items" ? ICON.list : ICON.check}${escapeHtml(q.label)}${q.required ? `<span class="req">*</span>` : ""}</div>
         ${qInput(q, mine?.answers?.[q.id])}
       </div>`).join("")}
-      <div id="err"></div>
-      <button class="btn primary block" type="submit">${mine ? "수정 저장" : "응답 보내기"}</button>
-      ${mine ? `<button class="btn danger block" type="button" id="del" style="margin-top:8px">내 응답 취소</button>` : ""}
-    </form>` : !open ? `<div class="card sub">마감된 조사입니다.</div>` : ""}
+      <div class="card">
+        <div class="sec-h">${ICON.user}응답자 정보</div>
+        <label class="field" for="name" style="margin-top:0">이름 <span class="req">*</span></label>
+        <input type="text" id="name" maxlength="30" autocomplete="nickname" placeholder="예: 채아아빠" value="${escapeHtml(lastName)}">
+        <div class="hint" style="margin-top:6px">같은 기기에서 다시 열면 수정·취소할 수 있어요.</div>
+        <div id="err"></div>
+        ${mine ? `<button class="btn danger block" type="button" id="del" style="margin-top:12px">내 응답 취소</button>` : ""}
+      </div>
+    </form>
+    <div class="bottombar"><div class="in">
+      <div class="sum" id="barsum"></div>
+      <button class="btn primary" type="submit" form="form">${mine ? "수정 저장" : "응답 보내기"}</button>
+    </div></div>` : !open ? `<div class="card sub">마감된 조사입니다.</div>` : ""}
+    <div id="board"></div>
   `;
 
   startBoard(survey);
   $("#share").addEventListener("click", () => shareLink(survey.title, surveyUrl(survey.id)));
   $("#edit")?.addEventListener("click", () => { editing = true; render(survey, mine); });
+  $("#edit2")?.addEventListener("click", () => { editing = true; render(survey, mine); });
   if (!showForm) return;
   bind(survey);
+  $("#form").addEventListener("change", updateBar);
+  $("#form").addEventListener("input", updateBar);
+  updateBar();
   $("#form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = $("#name").value.trim();
@@ -209,7 +259,7 @@ async function render(survey, mine, message = "") {
     const errors = validateResponse(survey, name, answers);
     $("#err").innerHTML = errorsBox(errors);
     if (errors.length) { $("#err").scrollIntoView({ behavior: "smooth", block: "center" }); return; }
-    const btn = e.submitter || $("button[type=submit]");
+    const btn = e.submitter || $(".bottombar button[type=submit]");
     btn.disabled = true;
     try {
       await saveMyResponse(survey.id, name, cleanAnswers(survey, answers));
