@@ -1,0 +1,11 @@
+{
+  "name": "parent-survey",
+  "version": "1.0.0",
+  "private": true,
+  "description": "채아 학년·씨앗별 학부모 조사 통합 관리 페이지",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "start": "python3 -m http.server 8080"
+  }
+}
