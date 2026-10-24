@@ -36,6 +36,21 @@
 
 질문 형식: 참석, 품목, 숫자, 하나, 여러개, 글. 옵션: 필수(기본)/선택, 인원, 단위=…
 
+## 요구사항만 주면 조사가 바로 생기는 흐름
+
+1. 단톡방 요청을 Claude 채팅에 그대로 붙여 넣습니다.
+2. Claude가 `surveys/영문-이름.txt` 파일을 만들어 PR → 검사 → 머지합니다.
+3. 머지되면 GitHub Actions가 Firestore에 조사를 등록하고 사이트에 바로 나타납니다.
+4. Claude가 응답 링크와 카톡 공지 문구를 알려 줍니다.
+
+### 자동 등록 설정 (한 번만)
+
+1. Firebase 콘솔 > 프로젝트 설정 > 서비스 계정 > "새 비공개 키 생성" → JSON 파일 내려받기
+2. GitHub 저장소 > Settings > Secrets and variables > Actions > New repository secret
+   - Name: `FIREBASE_SERVICE_ACCOUNT`
+   - Secret: 내려받은 JSON 파일 내용 전체
+3. 키 파일은 다른 곳에 올리지 말고 등록 후 지워 주세요. 이 키는 데이터베이스 전체 권한입니다.
+
 ## 화면
 
 | 파일 | 용도 |

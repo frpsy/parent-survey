@@ -503,11 +503,51 @@ export function surveyToText(s, groupList = []) {
 
 // 지난 조사로 다음 회차 만들기: 마감을 7일 뒤로(이미 지났으면 오늘부터 3일 뒤 밤 9시)
 export function nextRound(survey, now = Date.now()) {
-  const { id, createdAt, updatedAt, ...rest } = survey;
+  const { id, createdAt, updatedAt, source, ...rest } = survey;
   let deadlineMs = null;
   if (survey.deadlineMs) {
     deadlineMs = survey.deadlineMs;
     while (deadlineMs <= now) deadlineMs += 7 * 24 * 3600 * 1000;
   }
   return { ...rest, title: survey.title.replace(/\s*\(복사본\)$/, ""), status: "open", deadlineMs };
+}
+
+// ---------- 파일로 관리하는 조사 (surveys/*.txt → 자동 등록) ----------
+// 같은 파일을 다시 등록해도 응답이 이어지도록, 질문·항목 id를 내용에서 고정적으로 만듦
+export function stableId(text, len = 6) {
+  let h = 2166136261;
+  for (const ch of String(text)) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619) >>> 0; }
+  const chars = "abcdefghijkmnpqrstuvwxyz23456789";
+  let out = "";
+  for (let i = 0; i < len; i++) { out += chars[h % chars.length]; h = Math.imul(h ^ (h >>> 13), 2654435761) >>> 0; }
+  return out;
+}
+
+export function withStableIds(survey, slug) {
+  const seen = new Set();
+  const uniq = (base) => { let id = base, n = 1; while (seen.has(id)) id = stableId(`${base}#${n++}`); seen.add(id); return id; };
+  return {
+    ...survey,
+    id: slug,
+    questions: survey.questions.map((q) => ({
+      ...q,
+      id: uniq(stableId(`${slug}|q|${q.type}|${q.label}`)),
+      ...(q.options ? { options: q.options.map((o) => ({ ...o, id: uniq(stableId(`${slug}|o|${q.label}|${o.label}`)) })) } : {}),
+    })),
+  };
+}
+
+export function slugFromFile(name) {
+  return String(name).replace(/^.*\//, "").replace(/\.txt$/, "").toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+}
+
+// 마감까지 남은 정도 (학부모 화면 배지)
+export function dueLabel(survey, now = Date.now()) {
+  if (!isOpen(survey, now)) return { text: "마감", tone: "closed" };
+  if (!survey.deadlineMs) return { text: "진행 중", tone: "" };
+  const kst = (ms) => Math.floor((ms + 9 * 3600 * 1000) / 86400000);
+  const days = kst(survey.deadlineMs) - kst(now);
+  if (days <= 0) return { text: "오늘 마감", tone: "urgent" };
+  if (days === 1) return { text: "내일 마감", tone: "urgent" };
+  return { text: `D-${days}`, tone: "" };
 }

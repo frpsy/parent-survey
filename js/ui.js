@@ -62,3 +62,19 @@ export function fail(root, err) {
   console.error(err);
   root.innerHTML = `${header()}<div class="errors" role="alert">불러오지 못했습니다. 잠시 후 다시 시도해 주세요.<br><small>${String(err?.message || err).replace(/</g, "&lt;")}</small></div>`;
 }
+
+// 이 기기에서 응답한 조사 표시 (목록의 "응답함" 배지용)
+const DONE = "ps_done";
+export function doneSet() { try { return new Set(JSON.parse(localStorage.getItem(DONE) || "[]")); } catch { return new Set(); } }
+export function markDone(id, on = true) {
+  const s = doneSet();
+  if (on) s.add(id); else s.delete(id);
+  try { localStorage.setItem(DONE, JSON.stringify([...s])); } catch { /* 무시 */ }
+}
+
+export async function shareLink(title, url) {
+  if (navigator.share) {
+    try { await navigator.share({ title, url }); return; } catch { /* 취소 */ }
+  }
+  await copyText(url, "링크를 복사했습니다");
+}
