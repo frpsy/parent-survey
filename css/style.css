@@ -1,29 +1,29 @@
 :root {
-  --bg: #f7f5f0;
+  --bg: #f8f6fc;
   --card: #ffffff;
-  --ink: #23261f;
-  --muted: #6b6f63;
-  --line: #e4e1d8;
-  --accent: #ef6c1a;
+  --ink: #25222e;
+  --muted: #6d667c;
+  --line: #e5dff0;
+  --accent: #7c5cbf;
   --accent-ink: #ffffff;
-  --accent-soft: #fdeee3;
-  --warn: #b5532f;
-  --warn-soft: #fbece5;
+  --accent-soft: #f0eaf9;
+  --warn: #b8435a;
+  --warn-soft: #fbe9ee;
   --radius: 14px;
-  --shadow: 0 1px 2px rgba(30, 35, 25, 0.06), 0 4px 14px rgba(30, 35, 25, 0.05);
+  --shadow: 0 1px 2px rgba(60, 40, 100, 0.06), 0 4px 14px rgba(60, 40, 100, 0.06);
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #171915;
-    --card: #20231e;
-    --ink: #eceee6;
-    --muted: #a3a89a;
-    --line: #34382f;
-    --accent: #ff9a52;
-    --accent-ink: #10140f;
-    --accent-soft: #3a2a1f;
-    --warn: #ec9a76;
-    --warn-soft: #3a2a22;
+    --bg: #16141d;
+    --card: #201d2a;
+    --ink: #ece9f4;
+    --muted: #aaa4ba;
+    --line: #38334b;
+    --accent: #b79df0;
+    --accent-ink: #17121f;
+    --accent-soft: #2e2640;
+    --warn: #f08aa0;
+    --warn-soft: #3a2229;
     --shadow: none;
   }
 }
@@ -153,7 +153,7 @@ footer a { color: var(--muted); }
 .search { margin: 4px 0 12px; }
 
 /* ---------- 응답 화면 (참고 디자인) ---------- */
-.hero { background: linear-gradient(135deg, #f7892b, #ec5f12); color: #fff; margin: 0 -16px 14px; padding: 18px 16px 20px; }
+.hero { background: linear-gradient(135deg, #a98be6, #7352bd); color: #fff; margin: 0 -16px 14px; padding: 18px 16px 20px; }
 .hero h1 { font-size: 1.3rem; margin: 6px 0 2px; letter-spacing: -0.02em; }
 .hero p { margin: 0; opacity: 0.92; font-size: 0.92rem; white-space: pre-line; }
 .hero .meta { color: rgba(255,255,255,0.9); }
@@ -172,7 +172,7 @@ footer a { color: var(--muted); }
 .live-dot { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.85rem; font-weight: 500; margin-left: auto; }
 .live-dot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #1fa45a; }
 .tot { display: flex; justify-content: space-between; align-items: center; background: var(--accent-soft); border-radius: 14px; padding: 16px; margin: 12px 0 6px; font-weight: 700; }
-.tot .amt { color: #c4500d; font-size: 1.45rem; }
+.tot .amt { color: var(--accent); font-size: 1.45rem; }
 .person { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .person:last-child { border-bottom: 0; }
 .avatar { width: 36px; height: 36px; border-radius: 50%; color: #fff; display: grid; place-items: center; font-weight: 700; flex: none; }

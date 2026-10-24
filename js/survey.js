@@ -117,7 +117,7 @@ const ICON = {
   board: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6"/></svg>',
   check: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12l5 5L20 7"/></svg>',
 };
-const AV = ["#f0712a", "#1f9e5a", "#3b7dd8", "#a654c9", "#d4448a", "#2a9d9b"];
+const AV = ["#8b6fd6", "#1f9e5a", "#3b7dd8", "#e0873a", "#d4448a", "#2a9d9b"];
 function avatar(name) {
   let h = 0;
   for (const ch of String(name)) h = (h * 31 + ch.codePointAt(0)) >>> 0;
