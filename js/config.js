@@ -18,7 +18,7 @@ export const adminEmails = [
 
 // 조사를 묶어서 관리하는 모임(그룹) 목록. 순서대로 탭에 표시됩니다.
 export const groups = [
-  { id: "grade", name: "채아 학년", desc: "채아 학년 학부모 조사" },
+  { id: "grade", name: "2학년", desc: "채아네 2학년(18년생) 학부모 조사" },
   { id: "ssiat", name: "씨앗별", desc: "씨앗별 학부모 조사" },
 ];
 

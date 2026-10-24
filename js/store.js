@@ -39,12 +39,16 @@ function lsSet(k, v) {
   try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* 저장 불가 환경 */ }
 }
 // 체험 모드 첫 방문 시 샘플 조사를 한 번만 넣음 (지운 샘플은 다시 생기지 않음)
-const LS_SEEDED = "ps_seeded_v1";
+// v2: 샘플 제목 변경(학년 → 2학년)을 이미 받은 기기에도 반영
+const LS_SEEDED = "ps_seeded_v2";
 function ensureSamples() {
   if (lsGet(LS_SEEDED, false)) return;
+  const hadV1 = lsGet("ps_seeded_v1", false);
   const all = lsGet(LS_SURVEYS, []);
   for (const s of sampleSurveys) {
-    if (!all.some((x) => x.id === s.id)) all.push({ ...s, updatedAt: s.createdAt });
+    const i = all.findIndex((x) => x.id === s.id);
+    if (i >= 0) all[i] = { ...all[i], title: s.title };
+    else if (!hadV1) all.push({ ...s, updatedAt: s.createdAt });
     const rs = lsGet(LS_RESP(s.id), {});
     for (const r of sampleResponses[s.id] || []) if (!rs[r.id]) rs[r.id] = r;
     lsSet(LS_RESP(s.id), rs);
@@ -175,4 +179,20 @@ export async function deleteResponse(surveyId, responseId) {
   }
   const f = await initFirebase();
   await f.fs.deleteDoc(f.fs.doc(f.db, "surveys", surveyId, "responses", responseId));
+}
+
+// ---------- 명단: 관리자만 읽고 씀 (코드·저장소에는 넣지 않음) ----------
+const LS_ROSTER = (g) => `ps_roster_${g}`;
+
+export async function getRoster(groupId) {
+  if (mode === "local") return lsGet(LS_ROSTER(groupId), []);
+  const f = await initFirebase();
+  const d = await f.fs.getDoc(f.fs.doc(f.db, "rosters", groupId));
+  return d.exists() ? d.data().households || [] : [];
+}
+
+export async function saveRoster(groupId, households) {
+  if (mode === "local") { lsSet(LS_ROSTER(groupId), households); return; }
+  const f = await initFirebase();
+  await f.fs.setDoc(f.fs.doc(f.db, "rosters", groupId), { households, updatedAt: Date.now() });
 }

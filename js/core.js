@@ -70,7 +70,7 @@ export function isOpen(survey, now = Date.now()) {
 
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 export function formatDeadline(ms) {
-  if (!ms) return "마감 없음";
+  if (!ms) return "없음";
   // 한국 시간 기준으로 표시
   const d = new Date(ms + 9 * 3600 * 1000);
   const h = d.getUTCHours();
@@ -254,10 +254,14 @@ export function buildInviteText(survey, url, groupName) {
   return lines.join("\n");
 }
 
-export function buildSummaryText(survey, responses, groupName) {
+export function buildSummaryText(survey, responses, groupName, roster = []) {
   const res = aggregate(survey, responses);
   const lines = [`[조사 결과] ${survey.title}${groupName ? ` (${groupName})` : ""}`];
   lines.push(`마감: ${formatDeadline(survey.deadlineMs)} · 응답 ${responses.length}명`);
+  if (roster.length) {
+    const m = matchRoster(roster, responses);
+    lines.push(`응답 가정 ${m.answered.length}/${m.total}${m.missing.length ? ` · 미응답: ${m.missing.join(", ")}` : ""}`);
+  }
   res.forEach((r, i) => {
     lines.push("", `${i + 1}. ${r.q.label}`);
     switch (r.q.type) {
@@ -340,4 +344,56 @@ export function templates() {
       ],
     },
   };
+}
+
+// ---------- 명단(가정) ----------
+// 한 줄 = 한 가정. 아이 이름을 쓰고, 쌍둥이·형제는 쉼표로 함께 씀. 예) "채아" / "정인, 현겸"
+// 성까지 쓴 세 글자 이름(박채아)은 이름 두 글자(채아)로 맞춤
+export function givenName(n) {
+  const t = String(n).trim().replace(/\s+/g, "");
+  return /^[가-힣]{3}$/.test(t) ? t.slice(1) : t;
+}
+
+export function parseRoster(text) {
+  return String(text || "")
+    .split("\n")
+    .map((l) => l.replace(/#.*/, "").trim())
+    .filter(Boolean)
+    .map((line) => {
+      const kids = line.split(/[,，·/]/).map(givenName).filter(Boolean);
+      return { label: kids.join("·"), keys: kids };
+    })
+    .filter((h) => h.keys.length);
+}
+
+export function rosterToText(roster = []) {
+  return roster.map((h) => h.keys.join(", ")).join("\n");
+}
+
+// 응답 이름에 아이 이름이 들어 있으면 그 가정이 응답한 것으로 봄 (예: "채아아빠", "박상열(채아)")
+export function matchRoster(roster = [], responses = []) {
+  const names = responses.map((r) => String(r.name).replace(/\s+/g, ""));
+  const used = new Set();
+  const answered = [];
+  const missing = [];
+  for (const h of roster) {
+    const hit = names.findIndex((n) => h.keys.some((k) => n.includes(k)));
+    if (hit >= 0) {
+      answered.push(h.label);
+      names.forEach((n, i) => { if (h.keys.some((k) => n.includes(k))) used.add(i); });
+    } else {
+      missing.push(h.label);
+    }
+  }
+  const unknown = responses.filter((_, i) => !used.has(i)).map((r) => r.name);
+  return { total: roster.length, answered, missing: koSort(missing), unknown: koSort(unknown) };
+}
+
+export function buildReminderText(survey, url, missingLabels) {
+  const lines = [`[조사 안내] ${survey.title}`, ""];
+  lines.push(`아직 응답이 없는 가정: ${missingLabels.join(", ")}`);
+  lines.push(`마감: ${formatDeadline(survey.deadlineMs)}`);
+  lines.push(`응답: ${url}`);
+  lines.push("", "바쁘시겠지만 시간 되실 때 답 부탁드립니다.");
+  return lines.join("\n");
 }

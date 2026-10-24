@@ -7,7 +7,7 @@ export const sampleSurveys = [
   {
     id: "sample-grade",
     group: "grade",
-    title: "[샘플] 11월 학년 아빠 모임 참석",
+    title: "[샘플] 11월 2학년 아빠 모임 참석",
     desc: "11월 아빠 모임 날짜와 참석 여부를 정하려고 합니다.\n장소는 참석 인원이 정해지면 따로 알려 드리겠습니다.",
     status: "open",
     deadlineMs: KST(2026, 11, 6, 21),

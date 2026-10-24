@@ -50,7 +50,7 @@ test("마감 판정", () => {
 
 test("마감 표기는 한국 시간", () => {
   assert.equal(formatDeadline(survey.deadlineMs), "10월 30일(금) 오후 9시");
-  assert.equal(formatDeadline(null), "마감 없음");
+  assert.equal(formatDeadline(null), "없음");
 });
 
 test("조사 검증", () => {
@@ -132,4 +132,21 @@ test("샘플 조사와 응답은 유효", async () => {
     assert.deepEqual(validateSurvey(s), []);
     for (const r of sampleResponses[s.id]) assert.deepEqual(validateResponse(s, r.name, r.answers), [], r.name);
   }
+});
+
+test("명단: 파싱과 미응답 계산", async () => {
+  const { parseRoster, matchRoster, rosterToText, buildReminderText } = await import("../js/core.js");
+  const roster = parseRoster("하늘\n홍바다 # 성 포함\n\n구름, 별이\n솔");
+  assert.deepEqual(roster.map((h) => h.label), ["하늘", "바다", "구름·별이", "솔"]);
+  assert.equal(rosterToText(roster), "하늘\n바다\n구름, 별이\n솔");
+  const m = matchRoster(roster, [
+    { name: "하늘아빠" }, { name: "김OO (별이맘)" }, { name: "하늘 엄마" }, { name: "모르는분" },
+  ]);
+  assert.equal(m.total, 4);
+  assert.deepEqual(m.answered, ["하늘", "구름·별이"]);
+  assert.deepEqual(m.missing, ["바다", "솔"]);
+  assert.deepEqual(m.unknown, ["모르는분"]);
+  const s = buildSummaryText(survey, responses, "2학년", parseRoster("채아\n가윤\n나연\n다은"));
+  assert.match(s, /응답 가정 3\/4 · 미응답: 다은/);
+  assert.match(buildReminderText(survey, "u", m.missing), /아직 응답이 없는 가정: 바다, 솔/);
 });
