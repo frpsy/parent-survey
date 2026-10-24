@@ -15,10 +15,10 @@ export function modeBanner() {
 }
 
 export function header(right = "") {
-  return `<header class="top"><h1><a href="./">${siteTitle}</a></h1><div class="top-actions">${right}${themeButton()}</div></header>`;
+  return `<header class="top"><h1><a href="./">${siteTitle}</a></h1><div class="top-actions">${right}</div></header>`;
 }
 
-// ---------- 화면 테마 (색·밝기, 이 기기에만 저장) ----------
+// ---------- 화면 테마 (색·밝기, 이 기기에만 저장, 관리자 화면에서만 고름) ----------
 const PALETTE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7H16a5 5 0 0 0 5-5c0-4-4-7.2-9-7.2z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10.5" cy="7.5" r="1"/><circle cx="15" cy="7.5" r="1"/></svg>';
 
 export function themeButton() {
