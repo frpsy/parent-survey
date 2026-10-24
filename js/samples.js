@@ -27,7 +27,7 @@ export const sampleSurveys = [
     desc: "소풍날 아침에 함께 받을 김밥을 주문합니다.\n아이 몫과 함께 오시는 가족 몫까지 적어 주세요.",
     status: "open",
     deadlineMs: KST(2026, 11, 4, 21),
-    publicResults: false,
+    publicResults: true,
     createdAt: KST(2026, 10, 24, 20),
     questions: [
       { id: "s1", type: "items", label: "김밥 종류별 수량", required: true, unit: "줄",
