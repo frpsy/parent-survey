@@ -7,7 +7,7 @@ import {
   QUESTION_TYPES, escapeHtml, formatDeadline, isOpen, validateSurvey, parseOptions, optionsToText,
   mergeOptionIds, templates, newId, aggregate, answerText, buildInviteText, buildSummaryText, toCSV,
   won, sortByName, parseRoster, rosterToText, matchRoster, buildReminderText,
-  parseSurveyText, surveyToText, nextRound,
+  parseSurveyText, surveyToText, nextRound, dueLabel,
 } from "./core.js";
 import { $, $$, header, modeBanner, groupName, errorsBox, toast, copyText, surveyUrl, fail } from "./ui.js";
 
@@ -339,46 +339,51 @@ async function viewResult(state, id) {
   currentGroup = survey.group;
   let roster = [];
   try { roster = await getRoster(survey.group); } catch { /* 무시 */ }
+  let moreOpen = false;
   const paint = (responses) => {
     const rm = roster.length ? matchRoster(roster, responses) : null;
     const open = isOpen(survey);
     const url = surveyUrl(id);
     const gName = groupName(survey.group);
+    const due = dueLabel(survey);
 
     root.innerHTML = `
       ${header(signOutBtn(state))}
       ${modeBanner()}
       <a class="btn small" href="#">← 목록</a>
       <div class="card" style="margin-top:12px">
-        <div class="meta"><span>${escapeHtml(gName)}</span><span class="pill ${open ? "" : "closed"}">${open ? "진행 중" : "마감"}</span></div>
+        <div class="meta"><span>${escapeHtml(gName)}</span><span class="pill ${due.tone}">${escapeHtml(due.text)}</span><span class="pill ${survey.publicResults ? "" : "closed"}">${survey.publicResults ? "현황판 공개" : "현황판 비공개"}</span></div>
         <h2 style="margin-top:6px">${escapeHtml(survey.title)}</h2>
-        <div class="meta"><span>응답 ${responses.length}명</span><span>마감 ${escapeHtml(formatDeadline(survey.deadlineMs))}</span><span class="pill">실시간</span></div>
-      <div class="row" style="margin-top:10px">
-        <span class="sub">현황판: ${survey.publicResults ? "모두에게 공개 중" : "관리자만 보기"}</span>
-        <button class="btn small" id="pubtoggle">${survey.publicResults ? "비공개로" : "모두에게 공개"}</button>
-      </div>
-        <div class="row" style="margin-top:12px">
-          <button class="btn small primary" id="invite">카톡 공지 복사</button>
-          <button class="btn small primary" id="summary">결과 요약 복사</button>
-          <button class="btn small" id="link">링크 복사</button>
-          <button class="btn small" id="csv">엑셀(CSV) 받기</button>
+        <div class="tiles">
+          <div class="tile"><b>${responses.length}</b><span>응답</span></div>
+          ${rm ? `<div class="tile ${rm.missing.length ? "warn" : ""}"><b>${rm.missing.length}</b><span>미응답 가정</span></div>` : ""}
+          <div class="tile wide"><b>${escapeHtml(formatDeadline(survey.deadlineMs))}</b><span>마감</span></div>
         </div>
-        <div class="row" style="margin-top:8px">
-          <a class="btn small" href="#edit/${id}">수정</a>
-          <button class="btn small" id="toggle">${survey.status === "open" ? "지금 마감" : "다시 열기"}</button>
-          <button class="btn small" id="dup">다음 회차로 복제</button>
-          <button class="btn small" id="astext">문안 복사</button>
-          <a class="btn small" href="${escapeHtml(url)}" target="_blank" rel="noopener">응답 화면</a>
-          <span class="spacer"></span>
-          <button class="btn small danger" id="del">삭제</button>
+        <div class="actions">
+          <button class="btn primary" id="invite">카톡 공지 복사</button>
+          <button class="btn primary" id="summary">결과 요약 복사</button>
+          <button class="btn" id="link">링크 복사</button>
+          <a class="btn" href="${escapeHtml(url)}" target="_blank" rel="noopener">응답 화면 열기</a>
         </div>
+        <details class="more" id="more" ${moreOpen ? "open" : ""}>
+          <summary>더 보기</summary>
+          <div class="more-list">
+            <a class="btn" href="#edit/${id}">수정</a>
+            <button class="btn" id="toggle">${survey.status === "open" ? "지금 마감" : "다시 열기"}</button>
+            <button class="btn" id="pubtoggle">${survey.publicResults ? "현황판 비공개로" : "현황판 모두에게 공개"}</button>
+            <button class="btn" id="csv">엑셀(CSV) 받기</button>
+            <button class="btn" id="dup">다음 회차로 복제</button>
+            <button class="btn" id="astext">문안 복사</button>
+            <button class="btn danger" id="del">삭제</button>
+          </div>
+        </details>
       </div>
       ${rm ? `<div class="card">
         <h3>응답 가정 ${rm.answered.length} / ${rm.total}</h3>
         ${rm.missing.length ? `<div class="stat"><span>미응답</span><span style="text-align:right">${rm.missing.map(escapeHtml).join(", ")}</span></div>` : `<div class="ok">모든 가정이 응답했습니다.</div>`}
         ${rm.unknown.length ? `<div class="stat"><span>명단과 안 맞는 이름</span><span style="text-align:right">${rm.unknown.map(escapeHtml).join(", ")}</span></div>` : ""}
         ${rm.missing.length && open ? `<button class="btn small" id="remind" style="margin-top:8px">미응답 안내 복사</button>` : ""}
-      </div>` : groups.find((g) => g.id === survey.group)?.roster === false ? "" : `<div class="card sub">명단을 넣으면 미응답 가정을 볼 수 있습니다. <a href="#roster/${escapeHtml(survey.group)}">명단 넣기</a></div>`}
+      </div>` : groups.find((g) => g.id === survey.group)?.roster === false ? "" : `<p class="sub" style="margin:0 0 12px">명단을 넣으면 미응답 가정을 볼 수 있습니다. <a href="#roster/${escapeHtml(survey.group)}">명단 넣기</a></p>`}
       ${responses.length ? aggregate(survey, responses).map(resultCard).join("") : `<div class="empty">아직 응답이 없습니다. 카톡 공지를 복사해 단톡방에 올려 보세요.</div>`}
       ${responses.length ? `<div class="card"><h3>응답자 ${responses.length}명</h3>
         <div class="table-scroll"><table class="list">
@@ -387,6 +392,7 @@ async function viewResult(state, id) {
         </table></div></div>` : ""}
     `;
     bindSignOut();
+    $("#more").addEventListener("toggle", (e) => { moreOpen = e.target.open; });
 
     $("#invite").addEventListener("click", () => copyText(buildInviteText(survey, url, gName), "카톡 공지를 복사했습니다"));
     $("#summary").addEventListener("click", () => copyText(buildSummaryText(survey, responses, gName, roster), "결과 요약을 복사했습니다"));
