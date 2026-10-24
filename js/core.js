@@ -88,11 +88,15 @@ export function sortByName(responses) {
   return [...responses].sort((a, b) => String(a.name).localeCompare(String(b.name), "ko"));
 }
 
+// firestore.rules 의 응답 답 개수 제한(answers.size() <= 50)과 같게 유지
+export const MAX_QUESTIONS = 50;
+
 export function validateSurvey(s) {
   const errors = [];
   if (!s.group) errors.push("모임을 골라 주세요.");
   if (!s.title || !s.title.trim()) errors.push("조사 제목을 입력해 주세요.");
   if (!s.questions || s.questions.length === 0) errors.push("질문을 하나 이상 추가해 주세요.");
+  if ((s.questions || []).length > MAX_QUESTIONS) errors.push(`질문은 ${MAX_QUESTIONS}개까지 넣을 수 있습니다.`);
   (s.questions || []).forEach((q, i) => {
     const n = i + 1;
     if (!q.label || !q.label.trim()) errors.push(`${n}번 질문 내용을 입력해 주세요.`);

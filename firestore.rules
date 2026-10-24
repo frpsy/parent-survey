@@ -38,7 +38,7 @@ service cloud.firestore {
         return d.keys().hasOnly(['uid', 'name', 'answers', 'updatedAt'])
           && d.uid == uid
           && d.name is string && d.name.size() > 0 && d.name.size() <= 30
-          && d.answers is map
+          && d.answers is map && d.answers.size() <= 50
           && d.updatedAt is number;
       }
 

@@ -15,8 +15,46 @@ export function modeBanner() {
 }
 
 export function header(right = "") {
-  return `<header class="top"><h1><a href="./">${siteTitle}</a></h1><div>${right}</div></header>`;
+  return `<header class="top"><h1><a href="./">${siteTitle}</a></h1><div class="top-actions">${right}${themeButton()}</div></header>`;
 }
+
+// ---------- 화면 테마 (색·밝기, 이 기기에만 저장) ----------
+const PALETTE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7H16a5 5 0 0 0 5-5c0-4-4-7.2-9-7.2z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10.5" cy="7.5" r="1"/><circle cx="15" cy="7.5" r="1"/></svg>';
+
+export function themeButton() {
+  return window.psTheme ? `<button class="btn small icon" type="button" data-theme-open aria-label="화면 테마" title="화면 테마">${PALETTE}</button>` : "";
+}
+
+function openTheme() {
+  const T = window.psTheme;
+  if (!T) return;
+  $("dialog.theme")?.remove();
+  const cur = T.get();
+  const dlg = document.createElement("dialog");
+  dlg.className = "theme";
+  dlg.setAttribute("aria-label", "화면 테마");
+  dlg.innerHTML = `<h3>화면 테마</h3>
+    <div class="section-title">색</div>
+    <div class="swatches" role="radiogroup" aria-label="색">
+      ${T.accents.map((a) => `<label class="swatch"><input type="radio" name="th_accent" value="${a.id}" ${cur.accent === a.id ? "checked" : ""}><i style="background:${a.hex}"></i><span>${escapeHtml(a.name)}</span></label>`).join("")}
+    </div>
+    <div class="section-title">밝기</div>
+    <div class="seg" role="radiogroup" aria-label="밝기">
+      ${T.modes.map((m) => `<label><input type="radio" name="th_mode" value="${m.id}" ${cur.mode === m.id ? "checked" : ""}><span>${escapeHtml(m.name)}</span></label>`).join("")}
+    </div>
+    <p class="hint" style="margin:12px 0 0">이 기기에만 적용됩니다.</p>
+    <button class="btn block" type="button" data-theme-close style="margin-top:14px">닫기</button>`;
+  document.body.appendChild(dlg);
+  dlg.addEventListener("change", (e) => {
+    if (e.target.name === "th_accent") T.set({ accent: e.target.value });
+    if (e.target.name === "th_mode") T.set({ mode: e.target.value });
+  });
+  dlg.addEventListener("click", (e) => { if (e.target === dlg || e.target.closest("[data-theme-close]")) dlg.close(); });
+  dlg.addEventListener("close", () => dlg.remove());
+  dlg.showModal();
+}
+
+document.addEventListener("click", (e) => { if (e.target.closest("[data-theme-open]")) openTheme(); });
 
 let toastTimer;
 export function toast(msg) {
@@ -60,7 +98,7 @@ export function errorsBox(errors) {
 
 export function fail(root, err) {
   console.error(err);
-  root.innerHTML = `${header()}<div class="errors" role="alert">불러오지 못했습니다. 잠시 후 다시 시도해 주세요.<br><small>${String(err?.message || err).replace(/</g, "&lt;")}</small></div>`;
+  root.innerHTML = `${header()}<div class="errors" role="alert">불러오지 못했습니다. 잠시 후 다시 시도해 주세요.<br><small>${escapeHtml(err?.message || err)}</small></div>`;
 }
 
 // 이 기기에서 응답한 조사 표시 (목록의 "응답함" 배지용)
