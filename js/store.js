@@ -1,6 +1,7 @@
 // 저장소: Firebase 설정이 있으면 Firestore, 없으면 이 브라우저(localStorage)에 저장하는 체험 모드
 import { firebaseConfig, adminEmails } from "./config.js";
 import { newId } from "./core.js";
+import { sampleSurveys, sampleResponses } from "./samples.js";
 
 export const mode = firebaseConfig.apiKey && firebaseConfig.projectId ? "firebase" : "local";
 
@@ -37,6 +38,22 @@ function lsGet(k, d) {
 function lsSet(k, v) {
   try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* 저장 불가 환경 */ }
 }
+// 체험 모드 첫 방문 시 샘플 조사를 한 번만 넣음 (지운 샘플은 다시 생기지 않음)
+const LS_SEEDED = "ps_seeded_v1";
+function ensureSamples() {
+  if (lsGet(LS_SEEDED, false)) return;
+  const all = lsGet(LS_SURVEYS, []);
+  for (const s of sampleSurveys) {
+    if (!all.some((x) => x.id === s.id)) all.push({ ...s, updatedAt: s.createdAt });
+    const rs = lsGet(LS_RESP(s.id), {});
+    for (const r of sampleResponses[s.id] || []) if (!rs[r.id]) rs[r.id] = r;
+    lsSet(LS_RESP(s.id), rs);
+  }
+  lsSet(LS_SURVEYS, all);
+  lsSet(LS_SEEDED, true);
+}
+if (mode === "local") ensureSamples();
+
 function localMe() {
   let me = lsGet(LS_ME, null);
   if (!me) { me = "local-" + newId(10); lsSet(LS_ME, me); }
