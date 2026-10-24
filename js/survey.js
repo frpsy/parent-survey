@@ -1,4 +1,4 @@
-import { getSurvey, getMyResponse, saveMyResponse, deleteMyResponse, listResponses } from "./store.js";
+import { getSurvey, getMyResponse, saveMyResponse, deleteMyResponse, watchResponses } from "./store.js";
 import {
   escapeHtml, formatDeadline, isOpen, validateResponse, cleanAnswers, ATTEND_CHOICES,
   answerText, aggregate, won,
@@ -111,32 +111,52 @@ function bind(survey) {
   }
 }
 
-function publicResults(survey, responses) {
+// 모두가 보는 실시간 현황판 (자유 입력 답은 보여 주지 않음)
+function liveBoard(survey, responses) {
   const res = aggregate(survey, responses);
-  return `<div class="card"><h3>현재 집계 (${responses.length}명 응답)</h3>
-    ${res.map((r) => {
-      let body = "";
-      if (r.q.type === "attend" || r.q.type === "choice" || r.q.type === "multi") {
-        body = r.rows.map((x) => `<div class="stat"><span>${escapeHtml(x.label)}</span><b>${x.count}${r.q.type === "attend" && r.q.headcount && x.label === "참석" ? ` (총 ${x.people}명)` : ""}</b></div>${x.names?.length ? `<div class="names">${x.names.map(escapeHtml).join(", ")}</div>` : ""}`).join("");
-      } else if (r.q.type === "items") {
-        body = r.rows.map((x) => `<div class="stat"><span>${escapeHtml(x.label)}</span><b>${x.qty}${escapeHtml(r.q.unit || "")}</b></div>`).join("")
-          + `<div class="stat"><span>합계</span><b>${r.totalQty}${escapeHtml(r.q.unit || "")}${r.totalPrice ? ` · ${won(r.totalPrice)}` : ""}</b></div>`;
-      } else if (r.q.type === "count") {
-        body = `<div class="stat"><span>합계</span><b>${r.total}${escapeHtml(r.q.unit || "")}</b></div>`;
-      } else {
-        return "";
-      }
-      return `<div class="q"><div class="q-label">${escapeHtml(r.q.label)}</div>${body}</div>`;
-    }).join("")}
+  const t = new Date();
+  const hhmm = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
+  const unitOf = (q) => escapeHtml(q.unit || "");
+  const blocks = res.map((r) => {
+    let body = "";
+    if (r.q.type === "items") {
+      body = `<div class="stat"><span>합계</span><b class="big">${r.totalQty}${unitOf(r.q)}</b></div>`
+        + r.rows.map((x) => `<div class="stat"><span>${escapeHtml(x.label)}</span><b>${x.qty}${unitOf(r.q)}${x.price ? ` · ${won(x.price)}` : ""}</b></div>`).join("")
+        + (r.totalPrice ? `<div class="stat"><span>금액 합계</span><b>${won(r.totalPrice)}</b></div>` : "")
+        + (r.perPerson.length ? `<details open><summary>누가 얼마나 (${r.perPerson.length}명)</summary>${r.perPerson.map((p) => `<div class="stat"><span>${escapeHtml(p.name)}</span><span style="text-align:right">${escapeHtml(p.text)}</span></div>`).join("")}</details>` : "");
+    } else if (r.q.type === "attend" || r.q.type === "choice" || r.q.type === "multi") {
+      body = r.rows.map((x) => `<div class="stat"><span>${escapeHtml(x.label)}</span><b>${x.count}${r.q.type === "attend" ? "가정" : ""}${r.q.type === "attend" && r.q.headcount && x.label === "참석" ? ` · 총 ${x.people}명` : ""}</b></div>${x.names?.length ? `<div class="names">${x.names.map(escapeHtml).join(", ")}</div>` : ""}`).join("");
+    } else if (r.q.type === "count") {
+      body = `<div class="stat"><span>합계</span><b class="big">${r.total}${unitOf(r.q)}</b></div>`
+        + r.list.map((x) => `<div class="stat"><span>${escapeHtml(x.name)}</span><span>${escapeHtml(x.value)}${unitOf(r.q)}</span></div>`).join("");
+    } else {
+      return "";
+    }
+    return `<div class="q"><div class="q-label">${escapeHtml(r.q.label)}</div>${body}</div>`;
+  }).join("");
+  return `<div class="card">
+    <div class="row"><h3 style="margin:0">실시간 현황</h3><span class="pill">${responses.length}명 응답</span><span class="spacer"></span><span class="sub">${hhmm} 갱신</span></div>
+    ${responses.length ? blocks : `<div class="empty" style="padding:16px 0">아직 응답이 없습니다. 첫 응답을 남겨 주세요.</div>`}
   </div>`;
+}
+
+let stopBoard = null;
+function startBoard(survey) {
+  if (stopBoard) { stopBoard(); stopBoard = null; }
+  const el = $("#board");
+  if (!el || !survey.publicResults) return;
+  el.innerHTML = `<div class="card sub">현황을 불러오는 중…</div>`;
+  stopBoard = watchResponses(survey.id, (responses) => {
+    const box = $("#board");
+    if (box) box.innerHTML = liveBoard(survey, responses);
+  }, () => {
+    const box = $("#board");
+    if (box) box.innerHTML = "";
+  });
 }
 
 async function render(survey, mine, message = "") {
   const open = isOpen(survey);
-  let resultsHtml = "";
-  if (survey.publicResults) {
-    try { resultsHtml = publicResults(survey, await listResponses(survey.id)); } catch { /* 권한 없음 */ }
-  }
   const lastName = mine?.name || (() => { try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; } })();
 
   root.innerHTML = `
@@ -150,6 +170,7 @@ async function render(survey, mine, message = "") {
       <div class="meta">마감 ${escapeHtml(formatDeadline(survey.deadlineMs))}</div>
     </div>
     ${message}
+    <div id="board"></div>
     ${mine && !message ? `<div class="ok">이미 응답하셨습니다. 아래에서 고친 뒤 다시 저장할 수 있습니다.</div>` : ""}
     ${open ? `
     <form class="card" id="form" novalidate>
@@ -163,9 +184,9 @@ async function render(survey, mine, message = "") {
       <button class="btn primary block" type="submit">${mine ? "수정 저장" : "응답 보내기"}</button>
       ${mine ? `<button class="btn danger block" type="button" id="del" style="margin-top:8px">내 응답 취소</button>` : ""}
     </form>` : `<div class="card">마감된 조사입니다.${mine ? `<br>내 응답: ${survey.questions.map((q) => escapeHtml(answerText(q, mine.answers?.[q.id]))).filter(Boolean).join(" / ")}` : ""}</div>`}
-    ${resultsHtml}
   `;
 
+  startBoard(survey);
   if (!open) return;
   bind(survey);
   $("#form").addEventListener("submit", async (e) => {
