@@ -7,6 +7,7 @@ import {
   QUESTION_TYPES, escapeHtml, formatDeadline, isOpen, validateSurvey, parseOptions, optionsToText,
   mergeOptionIds, templates, newId, aggregate, answerText, buildInviteText, buildSummaryText, toCSV,
   won, sortByName, parseRoster, rosterToText, matchRoster, buildReminderText,
+  parseSurveyText, surveyToText, nextRound,
 } from "./core.js";
 import { $, $$, header, modeBanner, groupName, errorsBox, toast, copyText, surveyUrl, fail } from "./ui.js";
 
@@ -44,14 +45,15 @@ async function viewList(state) {
         <a class="btn small" href="#new/${currentGroup}/gimbap">김밥 주문</a>
         <a class="btn small" href="#new/${currentGroup}/dinner">저녁 모임 참석</a>
         <a class="btn small" href="#new/${currentGroup}/picnic">야유회 참석 인원</a>
-        <a class="btn small primary" href="#new/${currentGroup}/blank">빈 양식</a>
+        <a class="btn small" href="#new/${currentGroup}/blank">빈 양식</a>
       </div>
+      <a class="btn primary block" href="#paste/${currentGroup}" style="margin-top:10px">문안 붙여넣기로 만들기</a>
     </div>
-    <div class="card row">
+    ${groups.find((g) => g.id === currentGroup)?.roster === false ? "" : `<div class="card row">
       <div><b>학부모 명단</b> <span class="sub">${roster.length ? `${roster.length}가정` : "아직 없음"} · 관리자만 봅니다</span></div>
       <span class="spacer"></span>
       <a class="btn small" href="#roster/${currentGroup}">${roster.length ? "명단 수정" : "명단 넣기"}</a>
-    </div>
+    </div>`}
     <div class="section-title">조사 ${mine.length}건</div>
     ${mine.length ? mine.map((s) => `<a class="card" href="#r/${s.id}">
         <h3>${escapeHtml(s.title)}</h3>
@@ -224,6 +226,33 @@ async function viewEdit(state, draft, hasResponses) {
   paint();
 }
 
+// ---------- 문안 붙여넣기 ----------
+function viewPaste(state, groupId, prevText = "", errors = []) {
+  currentGroup = groupId;
+  root.innerHTML = `
+    ${header(signOutBtn(state))}
+    ${modeBanner()}
+    <a class="btn small" href="#">← 목록</a>
+    <form class="card" id="pf" style="margin-top:12px">
+      <h3>문안 붙여넣기로 만들기</h3>
+      <p class="sub">채팅에서 받은 조사 문안을 그대로 붙여 넣으세요. 불러온 뒤 화면에서 확인하고 저장하면 됩니다. "모임:" 줄이 없으면 ${escapeHtml(groupName(groupId))}에 만듭니다.</p>
+      <textarea id="pt" style="min-height:280px" placeholder="모임: 2학년&#10;제목: 김밥 주문&#10;마감: 2026-11-04 21:00&#10;질문: 품목 | 김밥 종류별 수량 | 필수 | 단위=줄&#10;- 야채김밥 | 3000">${escapeHtml(prevText)}</textarea>
+      ${errorsBox(errors)}
+      <button class="btn primary block" type="submit" style="margin-top:10px">불러오기</button>
+    </form>`;
+  bindSignOut();
+  $("#pf").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = $("#pt").value;
+    const { survey, errors: errs } = parseSurveyText(text, groups);
+    if (!survey.group) survey.group = groupId;
+    const real = errs.filter((x) => x !== "모임을 골라 주세요.");
+    if (real.length) { viewPaste(state, groupId, text, real); return; }
+    history.replaceState(null, "", "#new");
+    viewEdit(state, survey, false);
+  });
+}
+
 // ---------- 명단 ----------
 async function viewRoster(state, groupId) {
   currentGroup = groupId;
@@ -314,7 +343,8 @@ async function viewResult(state, id) {
       <div class="row" style="margin-top:8px">
         <a class="btn small" href="#edit/${id}">수정</a>
         <button class="btn small" id="toggle">${survey.status === "open" ? "지금 마감" : "다시 열기"}</button>
-        <button class="btn small" id="dup">복제</button>
+        <button class="btn small" id="dup">다음 회차로 복제</button>
+        <button class="btn small" id="astext">문안 복사</button>
         <a class="btn small" href="${escapeHtml(url)}" target="_blank" rel="noopener">응답 화면</a>
         <span class="spacer"></span>
         <button class="btn small danger" id="del">삭제</button>
@@ -325,7 +355,7 @@ async function viewResult(state, id) {
       ${rm.missing.length ? `<div class="stat"><span>미응답</span><span style="text-align:right">${rm.missing.map(escapeHtml).join(", ")}</span></div>` : `<div class="ok">모든 가정이 응답했습니다.</div>`}
       ${rm.unknown.length ? `<div class="stat"><span>명단과 안 맞는 이름</span><span style="text-align:right">${rm.unknown.map(escapeHtml).join(", ")}</span></div>` : ""}
       ${rm.missing.length && open ? `<button class="btn small" id="remind" style="margin-top:8px">미응답 안내 복사</button>` : ""}
-    </div>` : `<div class="card sub">명단을 넣으면 미응답 가정을 볼 수 있습니다. <a href="#roster/${escapeHtml(survey.group)}">명단 넣기</a></div>`}
+    </div>` : groups.find((g) => g.id === survey.group)?.roster === false ? "" : `<div class="card sub">명단을 넣으면 미응답 가정을 볼 수 있습니다. <a href="#roster/${escapeHtml(survey.group)}">명단 넣기</a></div>`}
     ${responses.length ? aggregate(survey, responses).map(resultCard).join("") : `<div class="empty">아직 응답이 없습니다. 카톡 공지를 복사해 단톡방에 올려 보세요.</div>`}
     ${responses.length ? `<div class="card"><h3>응답자 ${responses.length}명</h3>
       <div class="table-scroll"><table class="list">
@@ -358,11 +388,13 @@ async function viewResult(state, id) {
     viewResult(state, id);
   });
   $("#dup").addEventListener("click", async () => {
-    const { id: _id, createdAt, updatedAt, ...rest } = survey;
-    const copy = await saveSurvey({ ...rest, title: `${survey.title} (복사본)`, status: "open", deadlineMs: defaultDeadline() });
+    const draft = nextRound(survey);
+    if (!draft.deadlineMs) draft.deadlineMs = defaultDeadline();
+    const copy = await saveSurvey(draft);
     toast("복제했습니다");
     location.hash = `#edit/${copy.id}`;
   });
+  $("#astext").addEventListener("click", () => copyText(surveyToText(survey, groups), "조사 문안을 복사했습니다"));
   $("#del").addEventListener("click", async () => {
     if (!confirm(`"${survey.title}" 조사와 응답 ${responses.length}건을 모두 지울까요? 되돌릴 수 없습니다.`)) return;
     await deleteSurvey(id);
@@ -413,7 +445,8 @@ async function route() {
       return viewEdit(state, JSON.parse(JSON.stringify(s)), n > 0);
     }
     if (view === "r" && a) return viewResult(state, a);
-    if (view === "roster" && groups.some((g) => g.id === a)) return viewRoster(state, a);
+    if (view === "roster" && groups.some((g) => g.id === a && g.roster !== false)) return viewRoster(state, a);
+    if (view === "paste") return viewPaste(state, groups.some((g) => g.id === a) ? a : currentGroup);
     return viewList(state);
   } catch (e) {
     fail(root, e);

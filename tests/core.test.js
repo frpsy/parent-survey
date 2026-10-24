@@ -150,3 +150,56 @@ test("명단: 파싱과 미응답 계산", async () => {
   assert.match(s, /응답 가정 3\/4 · 미응답: 다은/);
   assert.match(buildReminderText(survey, "u", m.missing), /아직 응답이 없는 가정: 바다, 솔/);
 });
+
+test("조사 문안 붙여넣기: 파싱과 왕복", async () => {
+  const { parseSurveyText, surveyToText } = await import("../js/core.js");
+  const groups = [{ id: "grade", name: "2학년" }, { id: "ssiat", name: "씨앗별" }];
+  const text = `\`\`\`
+모임: 씨앗별
+제목: 소풍 김밥 주문
+안내: 소풍날 아침에 받습니다.
+가족 몫까지 적어 주세요.
+마감: 2026-11-04 21:00
+결과공개: 아니오
+질문: 품목 | 김밥 종류별 수량 | 필수 | 단위=줄
+- 야채김밥 | 3,000
+- 유부김밥 | 3500
+질문: 참석 | 참석 여부 | 필수 | 인원
+질문: 하나 | 받는 곳
+- 학교 정문
+- 소풍 장소
+질문: 글 | 요청 사항 | 선택
+\`\`\``;
+  const { survey: s, errors } = parseSurveyText(text, groups);
+  assert.deepEqual(errors, []);
+  assert.equal(s.group, "ssiat");
+  assert.equal(s.desc, "소풍날 아침에 받습니다.\n가족 몫까지 적어 주세요.");
+  assert.equal(formatDeadline(s.deadlineMs), "11월 4일(수) 오후 9시");
+  assert.equal(s.questions.length, 4);
+  assert.equal(s.questions[0].unit, "줄");
+  assert.equal(s.questions[0].options[0].price, 3000);
+  assert.equal(s.questions[1].headcount, true);
+  assert.equal(s.questions[3].required, false);
+  const again = parseSurveyText(surveyToText(s, groups), groups);
+  assert.deepEqual(again.errors, []);
+  assert.equal(surveyToText(again.survey, groups), surveyToText(s, groups));
+});
+
+test("조사 문안 오류 안내", async () => {
+  const { parseSurveyText } = await import("../js/core.js");
+  const { errors } = parseSurveyText("모임: 3학년\n제목: x\n마감: 내일\n질문: 투표 | 무엇\n- a", [{ id: "grade", name: "2학년" }]);
+  assert.ok(errors.some((e) => e.includes("모임")));
+  assert.ok(errors.some((e) => e.includes("마감")));
+  assert.ok(errors.some((e) => e.includes("질문 형식")));
+  assert.ok(errors.some((e) => e.includes("항목(-)")));
+});
+
+test("다음 회차: 제목 정리, 마감 7일 단위로 미래로", async () => {
+  const { nextRound } = await import("../js/core.js");
+  const now = survey.deadlineMs + 3 * 24 * 3600 * 1000;
+  const n = nextRound({ ...survey, title: "김밥 주문 (복사본)", status: "closed" }, now);
+  assert.equal(n.id, undefined);
+  assert.equal(n.title, "김밥 주문");
+  assert.equal(n.status, "open");
+  assert.equal(n.deadlineMs, survey.deadlineMs + 7 * 24 * 3600 * 1000);
+});
