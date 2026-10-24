@@ -17,9 +17,10 @@ export const adminEmails = [
 ];
 
 // 조사를 묶어서 관리하는 모임(그룹) 목록. 순서대로 탭에 표시됩니다.
+// roster: false 이면 그 모임은 학부모 명단(미응답 확인) 기능을 쓰지 않습니다.
 export const groups = [
   { id: "grade", name: "2학년", desc: "채아네 2학년(18년생) 학부모 조사" },
-  { id: "ssiat", name: "씨앗별", desc: "씨앗별 학부모 조사" },
+  { id: "ssiat", name: "씨앗별", desc: "씨앗별 학부모 조사", roster: false },
 ];
 
 export const siteTitle = "학부모 조사함";

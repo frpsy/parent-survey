@@ -397,3 +397,117 @@ export function buildReminderText(survey, url, missingLabels) {
   lines.push("", "바쁘시겠지만 시간 되실 때 답 부탁드립니다.");
   return lines.join("\n");
 }
+
+// ---------- 조사 문안(텍스트) ↔ 조사 ----------
+// 채팅에서 받은 문안을 붙여 넣어 조사를 만들 때 쓰는 형식. 예:
+//   모임: 2학년
+//   제목: 김밥 주문
+//   안내: 소풍날 아침에 받을 김밥입니다.
+//   마감: 2026-11-04 21:00
+//   결과공개: 아니오
+//   질문: 품목 | 김밥 종류별 수량 | 필수 | 단위=줄
+//   - 야채김밥 | 3000
+//   질문: 하나 | 받는 곳 | 필수
+//   - 학교 정문
+export const TEXT_TYPES = { 참석: "attend", 품목: "items", 숫자: "count", 하나: "choice", 여러개: "multi", 글: "text" };
+const TYPE_TO_TEXT = Object.fromEntries(Object.entries(TEXT_TYPES).map(([k, v]) => [v, k]));
+
+function parseKstDate(s) {
+  const m = String(s).trim().match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})(?:\s+(\d{1,2})(?::(\d{2}))?)?$/);
+  if (!m) return undefined;
+  const [, y, mo, d, h = "23", mi = "59"] = m;
+  return Date.UTC(+y, +mo - 1, +d, +h - 9, +mi);
+}
+
+function kstDateText(ms) {
+  const d = new Date(ms + 9 * 3600 * 1000);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+}
+
+export function parseSurveyText(text, groupList = []) {
+  const errors = [];
+  const s = { title: "", desc: "", group: "", deadlineMs: null, publicResults: false, status: "open", questions: [] };
+  let last = null; // 마지막으로 연 필드: "desc" 또는 질문 객체
+  String(text || "").replace(/\r/g, "").split("\n").forEach((raw, idx) => {
+    const line = raw.trim();
+    const n = idx + 1;
+    if (!line || line.startsWith("```")) return;
+    const kv = line.match(/^(모임|제목|안내|마감|결과공개|질문)\s*[:：]\s*(.*)$/);
+    if (kv) {
+      const [, key, val] = kv;
+      last = null;
+      if (key === "모임") {
+        const g = groupList.find((x) => x.name === val.trim() || x.id === val.trim());
+        if (g) s.group = g.id; else errors.push(`${n}줄: 모임 "${val}"을(를) 찾지 못했습니다.`);
+      } else if (key === "제목") s.title = val.trim();
+      else if (key === "안내") { s.desc = val.trim(); last = "desc"; }
+      else if (key === "마감") {
+        if (/^(없음|-)?$/.test(val.trim())) s.deadlineMs = null;
+        else {
+          const ms = parseKstDate(val);
+          if (ms === undefined) errors.push(`${n}줄: 마감은 2026-11-04 21:00 형식으로 써 주세요.`);
+          else s.deadlineMs = ms;
+        }
+      } else if (key === "결과공개") s.publicResults = /^(예|네|공개|o|yes|true)$/i.test(val.trim());
+      else if (key === "질문") {
+        const parts = val.split("|").map((x) => x.trim());
+        const type = TEXT_TYPES[parts[0]];
+        if (!type) { errors.push(`${n}줄: 질문 형식은 ${Object.keys(TEXT_TYPES).join("·")} 중 하나로 써 주세요.`); return; }
+        const q = { id: newId(6), type, label: parts[1] || "", required: true };
+        for (const opt of parts.slice(2)) {
+          if (opt === "선택") q.required = false;
+          else if (opt === "필수") q.required = true;
+          else if (opt === "인원" && type === "attend") q.headcount = true;
+          else if (opt.startsWith("단위=")) q.unit = opt.slice(3).trim();
+        }
+        if (["items", "choice", "multi"].includes(type)) q.options = [];
+        if (type === "attend") q.headcount = !!q.headcount;
+        s.questions.push(q);
+        last = q;
+      }
+      return;
+    }
+    if (line.startsWith("-")) {
+      if (last && last.options) {
+        const [label, price] = line.slice(1).split("|").map((x) => x.trim());
+        const o = { id: newId(6), label };
+        const p = Number(String(price || "").replace(/[^0-9.]/g, ""));
+        if (last.type === "items" && p > 0) o.price = p;
+        if (label) last.options.push(o);
+      } else errors.push(`${n}줄: 항목(-)은 품목·하나·여러개 질문 아래에 써 주세요.`);
+      return;
+    }
+    if (last === "desc") { s.desc += `\n${line}`; return; }
+    errors.push(`${n}줄을 이해하지 못했습니다: ${line.slice(0, 30)}`);
+  });
+  return { survey: s, errors: [...errors, ...validateSurvey(s)] };
+}
+
+export function surveyToText(s, groupList = []) {
+  const lines = [];
+  lines.push(`모임: ${groupList.find((g) => g.id === s.group)?.name || s.group}`);
+  lines.push(`제목: ${s.title}`);
+  if (s.desc) lines.push(`안내: ${s.desc}`);
+  lines.push(`마감: ${s.deadlineMs ? kstDateText(s.deadlineMs) : "없음"}`);
+  lines.push(`결과공개: ${s.publicResults ? "예" : "아니오"}`);
+  for (const q of s.questions) {
+    const opts = [q.required ? "필수" : "선택"];
+    if (q.type === "attend" && q.headcount) opts.push("인원");
+    if (q.unit) opts.push(`단위=${q.unit}`);
+    lines.push(`질문: ${TYPE_TO_TEXT[q.type]} | ${q.label} | ${opts.join(" | ")}`);
+    for (const o of q.options || []) lines.push(`- ${o.label}${o.price ? ` | ${o.price}` : ""}`);
+  }
+  return lines.join("\n");
+}
+
+// 지난 조사로 다음 회차 만들기: 마감을 7일 뒤로(이미 지났으면 오늘부터 3일 뒤 밤 9시)
+export function nextRound(survey, now = Date.now()) {
+  const { id, createdAt, updatedAt, ...rest } = survey;
+  let deadlineMs = null;
+  if (survey.deadlineMs) {
+    deadlineMs = survey.deadlineMs;
+    while (deadlineMs <= now) deadlineMs += 7 * 24 * 3600 * 1000;
+  }
+  return { ...rest, title: survey.title.replace(/\s*\(복사본\)$/, ""), status: "open", deadlineMs };
+}
