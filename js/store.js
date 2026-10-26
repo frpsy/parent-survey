@@ -20,9 +20,17 @@ async function initFirebase() {
   return fb;
 }
 
+// 관리자 화면 등에서 SDK를 미리 받아 두어 첫 조회를 앞당김
+export function warmUp() {
+  if (mode === "firebase") initFirebase().then(waitForUser).catch(() => {});
+}
+
+// 로그인 상태가 한 번 확정된 뒤에는 이벤트를 기다리지 않고 현재 값을 씀
+let authSettled = false;
 function waitForUser(f) {
+  if (authSettled) return Promise.resolve(f.authObj.currentUser);
   return new Promise((resolve) => {
-    const off = f.auth.onAuthStateChanged(f.authObj, (u) => { off(); resolve(u); });
+    const off = f.auth.onAuthStateChanged(f.authObj, (u) => { off(); authSettled = true; resolve(u); });
   });
 }
 
@@ -142,6 +150,15 @@ export async function listResponses(surveyId) {
   const f = await initFirebase();
   const snap = await f.fs.getDocs(f.fs.collection(f.db, "surveys", surveyId, "responses"));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+// 응답 수만 필요할 때: 문서 전체를 내려받지 않고 개수만 서버에서 셈
+export async function countResponses(surveyId) {
+  if (mode === "local") return Object.keys(lsGet(LS_RESP(surveyId), {})).length;
+  const f = await initFirebase();
+  const col = f.fs.collection(f.db, "surveys", surveyId, "responses");
+  if (!f.fs.getCountFromServer) return (await f.fs.getDocs(col)).size;
+  return (await f.fs.getCountFromServer(col)).data().count;
 }
 
 export async function getMyResponse(surveyId) {
