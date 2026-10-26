@@ -1,7 +1,7 @@
 import { groups } from "./config.js";
 import {
   mode, adminState, adminSignIn, adminSignOut, listSurveys, getSurvey, saveSurvey, deleteSurvey,
-  listResponses, deleteResponse, getRoster, saveRoster, watchResponses,
+  countResponses, deleteResponse, getRoster, saveRoster, watchResponses, warmUp,
 } from "./store.js";
 import {
   QUESTION_TYPES, escapeHtml, formatDeadline, isOpen, validateSurvey, parseOptions, optionsToText,
@@ -13,6 +13,13 @@ import { $, $$, header, modeBanner, groupName, errorsBox, toast, copyText, surve
 
 const root = $("#app");
 let currentGroup = groups[0].id;
+warmUp();
+
+// 화면 전환마다 올리는 번호: 느린 조회가 늦게 끝나도 다른 화면을 덮어쓰지 않게 함
+let navSeq = 0;
+
+// 목록 화면 캐시: 다시 들어올 때 먼저 보여 주고 뒤에서 새로 받음
+const cache = { surveys: null, rosters: {}, counts: {} };
 
 function signOutBtn(state) {
   return `${themeButton()}<button class="btn small" id="signout" title="${escapeHtml(state.email || "")}">로그아웃</button>`;
@@ -23,16 +30,12 @@ function bindSignOut() {
 
 // ---------- 목록 ----------
 async function viewList(state) {
-  const surveys = await listSurveys();
-  const counts = {};
-  await Promise.all(surveys.map(async (s) => {
-    try { counts[s.id] = (await listResponses(s.id)).length; } catch { counts[s.id] = "?"; }
-  }));
-  const mine = surveys.filter((s) => s.group === currentGroup).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  let roster = [];
-  try { roster = await getRoster(currentGroup); } catch { /* 무시 */ }
-
-  root.innerHTML = `
+  const seq = navSeq;
+  const draw = () => {
+    const mine = (cache.surveys || []).filter((s) => s.group === currentGroup).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const rosterKnown = currentGroup in cache.rosters;
+    const roster = cache.rosters[currentGroup] || [];
+    root.innerHTML = `
     ${header(signOutBtn(state))}
     ${modeBanner()}
     <div class="tabs" role="tablist">
@@ -50,36 +53,65 @@ async function viewList(state) {
       <a class="btn primary block" href="#paste/${currentGroup}" style="margin-top:10px">문안 붙여넣기로 만들기</a>
     </div>
     ${groups.find((g) => g.id === currentGroup)?.roster === false ? "" : `<div class="card row">
-      <div><b>학부모 명단</b> <span class="sub">${roster.length ? `${roster.length}가정` : "아직 없음"} · 관리자만 봅니다</span></div>
+      <div><b>학부모 명단</b> <span class="sub">${!rosterKnown ? "불러오는 중…" : roster.length ? `${roster.length}가정` : "아직 없음"} · 관리자만 봅니다</span></div>
       <span class="spacer"></span>
       <a class="btn small" href="#roster/${currentGroup}">${roster.length ? "명단 수정" : "명단 넣기"}</a>
     </div>`}
     <input type="search" class="search" id="q" placeholder="조사 제목 검색" aria-label="조사 제목 검색">
     <div id="lists"></div>
   `;
-  bindSignOut();
-  $$(".tab").forEach((b) => b.addEventListener("click", () => { currentGroup = b.dataset.g; viewList(state); }));
-  const adminCard = (s) => `<a class="card" href="#r/${s.id}">
+    bindSignOut();
+    $$(".tab").forEach((b) => b.addEventListener("click", () => { currentGroup = b.dataset.g; navSeq++; viewList(state); }));
+    const adminCard = (s) => `<a class="card" href="#r/${s.id}">
       <h3>${escapeHtml(s.title)}</h3>
       <div class="meta">
         <span class="pill ${dueLabel(s).tone}">${escapeHtml(dueLabel(s).text)}</span>
-        <span>응답 ${counts[s.id]}명</span>
+        <span>응답 <span data-cnt="${escapeHtml(s.id)}">${cache.counts[s.id] ?? "…"}</span>명</span>
         <span>마감 ${escapeHtml(formatDeadline(s.deadlineMs))}</span>
         ${s.source === "repo" ? `<span class="pill">파일</span>` : ""}
       </div>
     </a>`;
-  const paintLists = () => {
-    const term = $("#q").value.trim();
-    const hit = mine.filter((s) => !term || s.title.includes(term));
-    const op = hit.filter((s) => isOpen(s));
-    const cl = hit.filter((s) => !isOpen(s));
-    $("#lists").innerHTML = `
+    const paintLists = () => {
+      const term = $("#q").value.trim();
+      const hit = mine.filter((s) => !term || s.title.includes(term));
+      const op = hit.filter((s) => isOpen(s));
+      const cl = hit.filter((s) => !isOpen(s));
+      $("#lists").innerHTML = `
       <div class="section-title">진행 중 ${op.length}건</div>
       ${op.length ? op.map(adminCard).join("") : `<div class="empty">진행 중인 조사가 없습니다.</div>`}
       ${cl.length ? `<details ${term ? "open" : ""}><summary>마감 ${cl.length}건</summary>${cl.map(adminCard).join("")}</details>` : ""}`;
+    };
+    $("#q").addEventListener("input", paintLists);
+    paintLists();
   };
-  $("#q").addEventListener("input", paintLists);
-  paintLists();
+
+  // 응답 수는 서버에서 개수만 받아 카드에 채워 넣음 (화면은 기다리지 않고 먼저 그림)
+  const fillCounts = () => {
+    for (const s of (cache.surveys || []).filter((x) => x.group === currentGroup)) {
+      countResponses(s.id)
+        .catch(() => "?")
+        .then((n) => {
+          cache.counts[s.id] = n;
+          if (seq !== navSeq) return;
+          $$("[data-cnt]").filter((el) => el.dataset.cnt === s.id).forEach((el) => { el.textContent = n; });
+        });
+    }
+  };
+
+  const hadCache = !!cache.surveys && currentGroup in cache.rosters;
+  if (hadCache) { draw(); fillCounts(); }
+
+  const group = currentGroup;
+  const [surveys, roster] = await Promise.all([
+    listSurveys(),
+    getRoster(group).catch(() => cache.rosters[group] || []),
+  ]);
+  if (seq !== navSeq) return;
+  const changed = JSON.stringify([surveys, roster]) !== JSON.stringify([cache.surveys, cache.rosters[group]]);
+  cache.surveys = surveys;
+  cache.rosters[group] = roster;
+  if (!hadCache || changed) draw();
+  fillCounts();
 }
 
 // ---------- 편집 ----------
@@ -337,11 +369,16 @@ function stopLiveWatch() { if (stopLive) { stopLive(); stopLive = null; } }
 
 async function viewResult(state, id) {
   stopLiveWatch();
-  const survey = await getSurvey(id);
+  const seq = navSeq;
+  // 목록 캐시에서 모임을 알면 명단도 조사와 동시에 받음
+  const guess = cache.surveys?.find((x) => x.id === id)?.group || currentGroup;
+  const rosterOf = (g) => getRoster(g).catch(() => []);
+  const [survey, guessed] = await Promise.all([getSurvey(id), rosterOf(guess)]);
+  if (seq !== navSeq) return;
   if (!survey) { root.innerHTML = `${header(signOutBtn(state))}<div class="card">조사를 찾을 수 없습니다. <a href="#">목록</a></div>`; bindSignOut(); return; }
   currentGroup = survey.group;
-  let roster = [];
-  try { roster = await getRoster(survey.group); } catch { /* 무시 */ }
+  const roster = survey.group === guess ? guessed : await rosterOf(survey.group);
+  if (seq !== navSeq) return;
   let moreOpen = false;
   const paint = (responses) => {
     const rm = roster.length ? matchRoster(roster, responses) : null;
@@ -453,6 +490,7 @@ async function viewResult(state, id) {
 // ---------- 라우팅 ----------
 async function route() {
   stopLiveWatch();
+  navSeq++;
   try {
     const state = await adminState();
     if (!state.isAdmin) {
@@ -481,10 +519,10 @@ async function route() {
       return viewEdit(state, { ...tpl, group, status: "open", deadlineMs: defaultDeadline(), publicResults: true }, false);
     }
     if (view === "edit" && a) {
-      const s = await getSurvey(a);
+      const seq = navSeq;
+      const [s, n] = await Promise.all([getSurvey(a), countResponses(a).catch(() => 0)]);
+      if (seq !== navSeq) return;
       if (!s) { location.hash = "#"; return; }
-      let n = 0;
-      try { n = (await listResponses(a)).length; } catch { /* 무시 */ }
       return viewEdit(state, JSON.parse(JSON.stringify(s)), n > 0);
     }
     if (view === "r" && a) return viewResult(state, a);
