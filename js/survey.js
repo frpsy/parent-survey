@@ -35,9 +35,9 @@ function qInput(q, a) {
     case "count":
       return `<div class="row"><input type="number" name="${name}" min="0" inputmode="numeric" style="max-width:140px" value="${escapeHtml(a ?? "")}"> <span>${escapeHtml(q.unit || "")}</span></div>`;
     case "choice":
-      return `<div class="choices">${q.options.map((o) => `<label class="choice"><input type="radio" name="${name}" value="${o.id}" ${a === o.id ? "checked" : ""}><span>${escapeHtml(o.label)}</span></label>`).join("")}</div>`;
+      return `<div class="choices" role="radiogroup" aria-label="${escapeHtml(q.label)}">${q.options.map((o) => `<label class="choice"><input type="radio" name="${name}" value="${o.id}" ${a === o.id ? "checked" : ""}><span>${escapeHtml(o.label)}</span></label>`).join("")}</div>`;
     case "multi":
-      return `<div class="choices">${q.options.map((o) => `<label class="choice"><input type="checkbox" name="${name}" value="${o.id}" ${Array.isArray(a) && a.includes(o.id) ? "checked" : ""}><span>${escapeHtml(o.label)}</span></label>`).join("")}</div>`;
+      return `<div class="choices" role="group" aria-label="${escapeHtml(q.label)}">${q.options.map((o) => `<label class="choice"><input type="checkbox" name="${name}" value="${o.id}" ${Array.isArray(a) && a.includes(o.id) ? "checked" : ""}><span>${escapeHtml(o.label)}</span></label>`).join("")}</div>`;
     default:
       return `<textarea name="${name}" maxlength="500">${escapeHtml(a || "")}</textarea>`;
   }
@@ -199,6 +199,8 @@ function markTaken(responses) {
     const taken = !!h && names.some((n) => h.keys.some((k) => n.includes(k)));
     label.classList.toggle("taken", taken);
     input.disabled = taken;
+    if (taken) { label.title = "이미 응답한 가정이라 선택할 수 없어요"; input.setAttribute("aria-label", `${input.value}, 이미 응답한 가정이라 선택할 수 없음`); }
+    else { label.removeAttribute("title"); input.removeAttribute("aria-label"); }
     if (taken && input.checked) { input.checked = false; $("#name").value = ""; updateBar(); }
   });
 }
@@ -244,7 +246,7 @@ async function render(survey, mine, message = "") {
       <div class="card">
         <div class="sec-h">${ICON.user}응답자 정보</div>
         ${roster.length ? `<div class="field" style="margin-top:0">우리 집 아이 이름을 눌러 주세요 <span class="req">*</span></div>
-        <div class="choices" id="hh">${roster.map((h) => `<label class="choice"><input type="radio" name="hh" value="${escapeHtml(h.label)}" ${rosterName === h.label ? "checked" : ""}><span>${escapeHtml(h.label)}</span></label>`).join("")}</div>
+        <div class="choices" id="hh" role="radiogroup" aria-label="우리 집 아이 이름">${roster.map((h) => `<label class="choice"><input type="radio" name="hh" value="${escapeHtml(h.label)}" ${rosterName === h.label ? "checked" : ""}><span>${escapeHtml(h.label)}</span></label>`).join("")}</div>
         <input type="hidden" id="name" value="${escapeHtml(rosterName)}">` : `<label class="field" for="name" style="margin-top:0">이름 <span class="req">*</span></label>
         <input type="text" id="name" maxlength="30" autocomplete="nickname" placeholder="예: 채아아빠" value="${escapeHtml(lastName)}">`}
         <div class="hint" style="margin-top:6px">같은 기기에서 다시 열면 수정·취소할 수 있어요.</div>
