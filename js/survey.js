@@ -2,9 +2,9 @@ import { getSurvey, getMyResponse, saveMyResponse, deleteMyResponse, watchRespon
 import { groups } from "./config.js";
 import {
   escapeHtml, formatDeadline, isOpen, validateResponse, cleanAnswers, ATTEND_CHOICES,
-  answerText, aggregate, won, dueLabel, buildSummaryText,
+  answerText, aggregate, won, dueLabel,
 } from "./core.js";
-import { $, $$, header, modeBanner, groupName, errorsBox, toast, fail, shareLink, surveyUrl, copyText } from "./ui.js";
+import { $, $$, header, modeBanner, groupName, errorsBox, toast, fail, shareLink, surveyUrl } from "./ui.js";
 
 const root = $("#app");
 const id = new URLSearchParams(location.search).get("id");
@@ -143,7 +143,6 @@ function liveBoard(survey, responses) {
   return `<div class="card">
     <div class="sec-h">${ICON.board}전체 현황 <span class="live-dot">실시간 · ${responses.length}명</span></div>
     ${responses.length ? blocks : `<div class="empty" style="padding:16px 0">아직 응답이 없습니다. 첫 응답을 남겨 주세요.</div>`}
-    ${responses.length ? `<button class="btn kakao block" id="kakao" type="button" style="margin-top:14px">카톡 공유용 요약 복사</button>` : ""}
   </div>`;
 }
 
@@ -178,7 +177,6 @@ function startBoard(survey) {
     if (!box) return;
     box.innerHTML = liveBoard(survey, responses);
     markTaken(responses);
-    $("#kakao", box)?.addEventListener("click", () => copyText(buildSummaryText(survey, lastResponses, groupName(survey.group)), "요약을 복사했습니다. 카톡에 붙여 넣으세요"));
   }, () => {
     const box = $("#board");
     if (box) box.innerHTML = "";
