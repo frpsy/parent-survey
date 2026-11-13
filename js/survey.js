@@ -250,7 +250,7 @@ async function render(survey, mine, message = "") {
         <input type="hidden" id="name" value="${escapeHtml(rosterName)}">` : `<label class="field" for="name" style="margin-top:0">이름 <span class="req">*</span></label>
         <input type="text" id="name" maxlength="30" autocomplete="nickname" placeholder="예: 채아아빠" value="${escapeHtml(lastName)}">`}
         <div class="hint" style="margin-top:6px">같은 기기에서 다시 열면 수정·취소할 수 있어요.</div>
-        <div id="err"></div>
+        <div id="err" tabindex="-1"></div>
         ${mine ? `<button class="btn danger block" type="button" id="del" style="margin-top:12px">내 응답 취소</button>` : ""}
       </div>
     </form>
@@ -279,7 +279,7 @@ async function render(survey, mine, message = "") {
     const answers = readAnswers(survey);
     const errors = roster.length && !name ? ["우리 집 아이 이름을 눌러 주세요."] : validateResponse(survey, name, answers);
     $("#err").innerHTML = errorsBox(errors);
-    if (errors.length) { $("#err").scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+    if (errors.length) { $("#err").scrollIntoView({ behavior: "smooth", block: "center" }); $("#err").focus({ preventScroll: true }); return; }
     const btn = e.submitter || $(".bottombar button[type=submit]");
     btn.disabled = true;
     try {
@@ -292,6 +292,7 @@ async function render(survey, mine, message = "") {
     } catch (err) {
       btn.disabled = false;
       $("#err").innerHTML = errorsBox(["저장하지 못했습니다. 마감되었거나 연결이 불안정할 수 있습니다."]);
+      $("#err").focus({ preventScroll: true });
       console.error(err);
     }
   });

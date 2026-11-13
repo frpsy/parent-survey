@@ -251,11 +251,19 @@ body:has(.hero) .btn:focus-visible, body:has(.hero) .stepper button:focus-visibl
 body:has(.hero) .hero .btn:focus-visible { outline-color: #fff; }
 body:has(.hero) .stepper:focus-within, body:has(.hero) .menu-item:focus-within { border-color: var(--accent); }
 body:has(.hero) .errors { color: var(--ink); font-weight: 600; font-size: 1rem; line-height: 1.5; padding: 12px 14px; margin: 14px 0 4px; border: 1px solid var(--warn); border-left-width: 6px; scroll-margin-bottom: 110px; }
-body:has(.hero) .choice.taken span { opacity: 0.6; color: var(--muted); border-style: dashed; background: var(--chip); text-decoration: line-through; }
+body:has(.hero) .choice.taken span { opacity: 1; color: var(--muted); border-style: dashed; background: var(--chip); text-decoration: line-through; }
 body:has(.hero) .choice.taken span::after { content: " 응답함"; font-size: 0.78rem; font-weight: 600; margin-left: 6px; text-decoration: none; display: inline-block; }
 body:has(.hero) .bottombar { box-shadow: 0 -6px 18px rgba(30, 20, 50, 0.1); }
 body:has(.hero) .bottombar .sum small { font-size: 0.85rem; }
 body:has(.hero) .bottombar .sum b { font-weight: 800; }
+/* 3단계: 현황판 가독성·저장 완료 안내 */
+body:has(.hero) .stat b { font-variant-numeric: tabular-nums; font-size: 1.05rem; font-weight: 800; }
+body:has(.hero) .stat:has(+ .names) { border-bottom: 0; padding-bottom: 2px; }
+body:has(.hero) .names { font-size: 0.9rem; padding: 0 0 10px 12px; border-bottom: 1px dashed var(--line); }
+body:has(.hero) .names:last-child { border-bottom: 0; }
+body:has(.hero) .ok { display: flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 600; line-height: 1.5; padding: 14px; margin: 0 0 14px; border: 1px solid var(--accent); border-left-width: 6px; }
+body:has(.hero) .ok::before { content: "\2713"; flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: 0.9rem; font-weight: 800; }
+body:has(.hero) #err:focus { outline: none; }
 
 /* ---------- 관리자 결과 화면 ---------- */
 .tiles { display: flex; gap: 8px; margin: 12px 0; }
