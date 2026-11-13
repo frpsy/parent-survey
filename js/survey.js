@@ -177,6 +177,7 @@ function startBoard(survey) {
     const box = $("#board");
     if (!box) return;
     box.innerHTML = liveBoard(survey, responses);
+    markTaken(responses);
     $("#kakao", box)?.addEventListener("click", () => copyText(buildSummaryText(survey, lastResponses, groupName(survey.group)), "요약을 복사했습니다. 카톡에 붙여 넣으세요"));
   }, () => {
     const box = $("#board");
@@ -187,6 +188,20 @@ function startBoard(survey) {
 let editing = false;
 let currentSurvey = null;
 let roster = [];
+let mineName = "";
+
+// 이미 다른 응답이 있는 가정의 이름 버튼은 흐리게 하고 누르지 못하게 함 (내 응답은 제외)
+function markTaken(responses) {
+  const names = responses.filter((r) => r.name !== mineName).map((r) => String(r.name).replace(/\s+/g, ""));
+  $$("#hh .choice").forEach((label) => {
+    const input = $("input", label);
+    const h = roster.find((x) => x.label === input.value);
+    const taken = !!h && names.some((n) => h.keys.some((k) => n.includes(k)));
+    label.classList.toggle("taken", taken);
+    input.disabled = taken;
+    if (taken && input.checked) { input.checked = false; $("#name").value = ""; updateBar(); }
+  });
+}
 
 async function render(survey, mine, message = "") {
   const open = isOpen(survey);
@@ -197,6 +212,7 @@ async function render(survey, mine, message = "") {
   // 명단이 있으면 이름 입력칸 없이 버튼으로만 고른다. 이미 낸 응답 이름(명단 밖이어도)은 수정할 때 그대로 유지
   const rosterName = mine?.name || (roster.some((h) => h.label === lastName) ? lastName : "");
 
+  mineName = mine?.name || "";
   currentSurvey = survey;
   document.body.classList.toggle("has-bar", showForm);
   root.innerHTML = `
@@ -254,6 +270,7 @@ async function render(survey, mine, message = "") {
   $("#form").addEventListener("change", updateBar);
   $("#form").addEventListener("input", updateBar);
   updateBar();
+  markTaken(lastResponses);
   $("#form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = $("#name").value.trim();
