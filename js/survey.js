@@ -194,6 +194,9 @@ async function render(survey, mine, message = "") {
   const showForm = open && (!mine || editing);
   const lastName = mine?.name || (() => { try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; } })();
 
+  // 명단이 있으면 이름 입력칸 없이 버튼으로만 고른다. 이미 낸 응답 이름(명단 밖이어도)은 수정할 때 그대로 유지
+  const rosterName = mine?.name || (roster.some((h) => h.label === lastName) ? lastName : "");
+
   currentSurvey = survey;
   document.body.classList.toggle("has-bar", showForm);
   root.innerHTML = `
@@ -224,11 +227,10 @@ async function render(survey, mine, message = "") {
       </div>`).join("")}
       <div class="card">
         <div class="sec-h">${ICON.user}응답자 정보</div>
-        ${roster.length ? `<div class="field" style="margin-top:0">우리 집 아이 이름을 눌러 주세요</div>
-        <div class="choices" id="hh">${roster.map((h) => `<label class="choice"><input type="radio" name="hh" value="${escapeHtml(h.label)}" ${lastName === h.label ? "checked" : ""}><span>${escapeHtml(h.label)}</span></label>`).join("")}</div>
-        <div class="hint" style="margin:6px 0 10px">목록에 없으면 아래에 직접 적어 주세요.</div>` : ""}
-        <label class="field" for="name" style="margin-top:0">이름 <span class="req">*</span></label>
-        <input type="text" id="name" maxlength="30" autocomplete="nickname" placeholder="예: 채아아빠" value="${escapeHtml(lastName)}">
+        ${roster.length ? `<div class="field" style="margin-top:0">우리 집 아이 이름을 눌러 주세요 <span class="req">*</span></div>
+        <div class="choices" id="hh">${roster.map((h) => `<label class="choice"><input type="radio" name="hh" value="${escapeHtml(h.label)}" ${rosterName === h.label ? "checked" : ""}><span>${escapeHtml(h.label)}</span></label>`).join("")}</div>
+        <input type="hidden" id="name" value="${escapeHtml(rosterName)}">` : `<label class="field" for="name" style="margin-top:0">이름 <span class="req">*</span></label>
+        <input type="text" id="name" maxlength="30" autocomplete="nickname" placeholder="예: 채아아빠" value="${escapeHtml(lastName)}">`}
         <div class="hint" style="margin-top:6px">같은 기기에서 다시 열면 수정·취소할 수 있어요.</div>
         <div id="err"></div>
         ${mine ? `<button class="btn danger block" type="button" id="del" style="margin-top:12px">내 응답 취소</button>` : ""}
@@ -248,7 +250,7 @@ async function render(survey, mine, message = "") {
   if (!showForm) return;
   bind(survey);
   $$("#hh input").forEach((r) => r.addEventListener("change", () => { $("#name").value = r.value; updateBar(); }));
-  $("#name").addEventListener("input", () => { $$("#hh input").forEach((r) => { r.checked = r.value === $("#name").value.trim(); }); });
+  if ($("#name").type === "text") $("#name").addEventListener("input", () => { $$("#hh input").forEach((r) => { r.checked = r.value === $("#name").value.trim(); }); });
   $("#form").addEventListener("change", updateBar);
   $("#form").addEventListener("input", updateBar);
   updateBar();
@@ -256,7 +258,7 @@ async function render(survey, mine, message = "") {
     e.preventDefault();
     const name = $("#name").value.trim();
     const answers = readAnswers(survey);
-    const errors = validateResponse(survey, name, answers);
+    const errors = roster.length && !name ? ["우리 집 아이 이름을 눌러 주세요."] : validateResponse(survey, name, answers);
     $("#err").innerHTML = errorsBox(errors);
     if (errors.length) { $("#err").scrollIntoView({ behavior: "smooth", block: "center" }); return; }
     const btn = e.submitter || $(".bottombar button[type=submit]");
