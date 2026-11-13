@@ -189,7 +189,7 @@ footer a { color: var(--muted); }
 .search { margin: 4px 0 12px; }
 
 /* ---------- 응답 화면 (참고 디자인) ---------- */
-.hero { background: linear-gradient(135deg, var(--hero-1), var(--hero-2)); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); margin: 0 -16px 14px; padding: 18px 16px 20px; }
+.hero { background: linear-gradient(135deg, var(--hero-1), var(--hero-2)); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); margin: 12px 0 14px; padding: 18px 16px 20px; border-radius: 20px; }
 .hero h1 { font-size: 1.4rem; margin: 6px 0 2px; letter-spacing: -0.02em; }
 .hero p { margin: 0; opacity: 1; font-size: 1rem; font-weight: 500; white-space: pre-line; }
 .hero .meta { color: #fff; }
