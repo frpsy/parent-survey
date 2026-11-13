@@ -7,7 +7,7 @@ import {
   QUESTION_TYPES, escapeHtml, formatDeadline, isOpen, validateSurvey, parseOptions, optionsToText,
   mergeOptionIds, templates, newId, aggregate, answerText, buildInviteText, buildSummaryText, toCSV,
   won, sortByName, parseRoster, rosterToText, matchRoster, buildReminderText,
-  parseSurveyText, surveyToText, nextRound, dueLabel,
+  surveyToText, nextRound, dueLabel,
 } from "./core.js";
 import { $, $$, header, modeBanner, groupName, errorsBox, toast, copyText, surveyUrl, fail, themeButton } from "./ui.js";
 
@@ -48,9 +48,9 @@ async function viewList(state) {
         <a class="btn small" href="#new/${currentGroup}/gimbap">김밥 주문</a>
         <a class="btn small" href="#new/${currentGroup}/dinner">저녁 모임 참석</a>
         <a class="btn small" href="#new/${currentGroup}/picnic">야유회 참석 인원</a>
+        <a class="btn small" href="#new/${currentGroup}/care">돌봄 수요 조사</a>
         <a class="btn small" href="#new/${currentGroup}/blank">빈 양식</a>
       </div>
-      <a class="btn primary block" href="#paste/${currentGroup}" style="margin-top:10px">문안 붙여넣기로 만들기</a>
     </div>
     ${groups.find((g) => g.id === currentGroup)?.roster === false ? "" : `<div class="card row">
       <div><b>학부모 명단</b> <span class="sub">${!rosterKnown ? "불러오는 중…" : roster.length ? `${roster.length}가정` : "아직 없음"} · 응답 화면 이름 버튼에 쓰입니다</span></div>
@@ -274,33 +274,6 @@ async function viewEdit(state, draft, hasResponses) {
   };
 
   paint();
-}
-
-// ---------- 문안 붙여넣기 ----------
-function viewPaste(state, groupId, prevText = "", errors = []) {
-  currentGroup = groupId;
-  root.innerHTML = `
-    ${header(signOutBtn(state))}
-    ${modeBanner()}
-    <a class="btn small" href="#">← 목록</a>
-    <form class="card" id="pf" style="margin-top:12px">
-      <h3>문안 붙여넣기로 만들기</h3>
-      <p class="sub">채팅에서 받은 조사 문안을 그대로 붙여 넣으세요. 불러온 뒤 화면에서 확인하고 저장하면 됩니다. "모임:" 줄이 없으면 ${escapeHtml(groupName(groupId))}에 만듭니다.</p>
-      <textarea id="pt" style="min-height:280px" placeholder="모임: 2학년&#10;제목: 김밥 주문&#10;마감: 2026-11-04 21:00&#10;질문: 품목 | 김밥 종류별 수량 | 필수 | 단위=줄&#10;- 야채김밥 | 3000">${escapeHtml(prevText)}</textarea>
-      ${errorsBox(errors)}
-      <button class="btn primary block" type="submit" style="margin-top:10px">불러오기</button>
-    </form>`;
-  bindSignOut();
-  $("#pf").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const text = $("#pt").value;
-    const { survey, errors: errs } = parseSurveyText(text, groups);
-    if (!survey.group) survey.group = groupId;
-    const real = errs.filter((x) => x !== "모임을 골라 주세요.");
-    if (real.length) { viewPaste(state, groupId, text, real); return; }
-    history.replaceState(null, "", "#new");
-    viewEdit(state, survey, false);
-  });
 }
 
 // ---------- 명단 ----------
@@ -527,7 +500,6 @@ async function route() {
     }
     if (view === "r" && a) return viewResult(state, a);
     if (view === "roster" && groups.some((g) => g.id === a && g.roster !== false)) return viewRoster(state, a);
-    if (view === "paste") return viewPaste(state, groups.some((g) => g.id === a) ? a : currentGroup);
     return viewList(state);
   } catch (e) {
     fail(root, e);
