@@ -242,6 +242,17 @@ body:has(.hero) .hint { line-height: 1.5; }
 body:has(.hero) .q-label { font-size: 0.92rem; font-weight: 700; color: var(--muted); margin: 14px 0 4px; }
 body:has(.hero) .stat { padding: 8px 0; }
 body:has(.hero) .names { margin: 0 0 8px; line-height: 1.5; }
+/* 2단계: 조작성·접근성·오류 안내 */
+body:has(.hero) .hero .btn.small { min-height: 44px; padding: 8px 14px; font-size: 0.9rem; }
+body:has(.hero) .hero .pill { font-size: 0.82rem; padding: 4px 10px; }
+body:has(.hero) .hero .pill.urgent { background: #fff; color: #9f2f47; font-weight: 800; text-shadow: none; }
+body:has(.hero) .stepper button { width: 44px; height: 44px; }
+body:has(.hero) .btn:focus-visible, body:has(.hero) .stepper button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+body:has(.hero) .hero .btn:focus-visible { outline-color: #fff; }
+body:has(.hero) .stepper:focus-within, body:has(.hero) .menu-item:focus-within { border-color: var(--accent); }
+body:has(.hero) .errors { color: var(--ink); font-weight: 600; font-size: 1rem; line-height: 1.5; padding: 12px 14px; margin: 14px 0 4px; border: 1px solid var(--warn); border-left-width: 6px; scroll-margin-bottom: 110px; }
+body:has(.hero) .choice.taken span { opacity: 0.6; color: var(--muted); border-style: dashed; background: var(--chip); text-decoration: line-through; }
+body:has(.hero) .choice.taken span::after { content: " 응답함"; font-size: 0.78rem; font-weight: 600; margin-left: 6px; text-decoration: none; display: inline-block; }
 body:has(.hero) .bottombar { box-shadow: 0 -6px 18px rgba(30, 20, 50, 0.1); }
 body:has(.hero) .bottombar .sum small { font-size: 0.85rem; }
 body:has(.hero) .bottombar .sum b { font-weight: 800; }
