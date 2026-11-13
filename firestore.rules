@@ -14,9 +14,10 @@ service cloud.firestore {
         && request.auth.token.email in ['lgpsy83@gmail.com'];
     }
 
-    // 학부모 명단: 관리자만 (공개 사이트에서 읽히지 않음)
+    // 학부모 명단: 응답 화면의 이름 버튼용으로 한 건씩 읽기는 허용(아이 이름만 저장), 목록 조회·쓰기는 관리자만
     match /rosters/{groupId} {
-      allow read, write: if isAdmin();
+      allow get: if true;
+      allow list, write: if isAdmin();
     }
 
     match /surveys/{surveyId} {

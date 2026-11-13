@@ -53,7 +53,7 @@ async function viewList(state) {
       <a class="btn primary block" href="#paste/${currentGroup}" style="margin-top:10px">문안 붙여넣기로 만들기</a>
     </div>
     ${groups.find((g) => g.id === currentGroup)?.roster === false ? "" : `<div class="card row">
-      <div><b>학부모 명단</b> <span class="sub">${!rosterKnown ? "불러오는 중…" : roster.length ? `${roster.length}가정` : "아직 없음"} · 관리자만 봅니다</span></div>
+      <div><b>학부모 명단</b> <span class="sub">${!rosterKnown ? "불러오는 중…" : roster.length ? `${roster.length}가정` : "아직 없음"} · 응답 화면 이름 버튼에 쓰입니다</span></div>
       <span class="spacer"></span>
       <a class="btn small" href="#roster/${currentGroup}">${roster.length ? "명단 수정" : "명단 넣기"}</a>
     </div>`}
@@ -314,7 +314,7 @@ async function viewRoster(state, groupId) {
     <form class="card" id="rf" style="margin-top:12px">
       <h3>${escapeHtml(groupName(groupId))} 학부모 명단</h3>
       <p class="sub">한 줄에 한 가정씩 아이 이름만 적어 주세요. 쌍둥이·형제는 한 줄에 쉼표로 씁니다. 응답 이름에 아이 이름이 들어 있으면(예: 채아아빠) 응답한 가정으로 셉니다.</p>
-      <p class="sub">연락처·생년월일은 넣지 마세요. 명단은 관리자 화면에서만 보입니다.</p>
+      <p class="sub">연락처·생년월일은 넣지 마세요. 아이 이름만 넣으면 응답 화면에 이름 버튼으로 나옵니다.</p>
       <textarea id="rt" style="min-height:280px" placeholder="채아&#10;정인, 현겸">${escapeHtml(rosterToText(roster))}</textarea>
       <div class="sub" id="rc" style="margin:6px 0 10px"></div>
       <button class="btn primary block" type="submit">저장</button>

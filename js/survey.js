@@ -1,4 +1,5 @@
-import { getSurvey, getMyResponse, saveMyResponse, deleteMyResponse, watchResponses } from "./store.js";
+import { getSurvey, getMyResponse, saveMyResponse, deleteMyResponse, watchResponses, getRoster } from "./store.js";
+import { groups } from "./config.js";
 import {
   escapeHtml, formatDeadline, isOpen, validateResponse, cleanAnswers, ATTEND_CHOICES,
   answerText, aggregate, won, dueLabel, buildSummaryText,
@@ -185,6 +186,7 @@ function startBoard(survey) {
 
 let editing = false;
 let currentSurvey = null;
+let roster = [];
 
 async function render(survey, mine, message = "") {
   const open = isOpen(survey);
@@ -222,6 +224,9 @@ async function render(survey, mine, message = "") {
       </div>`).join("")}
       <div class="card">
         <div class="sec-h">${ICON.user}응답자 정보</div>
+        ${roster.length ? `<div class="field" style="margin-top:0">우리 집 아이 이름을 눌러 주세요</div>
+        <div class="choices" id="hh">${roster.map((h) => `<label class="choice"><input type="radio" name="hh" value="${escapeHtml(h.label)}" ${lastName === h.label ? "checked" : ""}><span>${escapeHtml(h.label)}</span></label>`).join("")}</div>
+        <div class="hint" style="margin:6px 0 10px">목록에 없으면 아래에 직접 적어 주세요.</div>` : ""}
         <label class="field" for="name" style="margin-top:0">이름 <span class="req">*</span></label>
         <input type="text" id="name" maxlength="30" autocomplete="nickname" placeholder="예: 채아아빠" value="${escapeHtml(lastName)}">
         <div class="hint" style="margin-top:6px">같은 기기에서 다시 열면 수정·취소할 수 있어요.</div>
@@ -242,6 +247,8 @@ async function render(survey, mine, message = "") {
   $("#edit2")?.addEventListener("click", () => { editing = true; render(survey, mine); });
   if (!showForm) return;
   bind(survey);
+  $$("#hh input").forEach((r) => r.addEventListener("change", () => { $("#name").value = r.value; updateBar(); }));
+  $("#name").addEventListener("input", () => { $$("#hh input").forEach((r) => { r.checked = r.value === $("#name").value.trim(); }); });
   $("#form").addEventListener("change", updateBar);
   $("#form").addEventListener("input", updateBar);
   updateBar();
@@ -286,6 +293,7 @@ async function render(survey, mine, message = "") {
     }
     document.title = `${survey.title} - 학부모 조사함`;
     const mine = await getMyResponse(id);
+    if (groups.find((g) => g.id === survey.group)?.roster !== false) roster = await getRoster(survey.group).catch(() => []);
     await render(survey, mine);
   } catch (e) {
     fail(root, e);
