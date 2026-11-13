@@ -227,3 +227,10 @@ test("질문 개수는 규칙의 답 개수 제한을 넘지 않음", () => {
   assert.ok(validateSurvey({ group: "grade", title: "t", questions: qs }).some((e) => e.includes(`${MAX_QUESTIONS}개`)));
   assert.deepEqual(validateSurvey({ group: "grade", title: "t", questions: qs.slice(1) }), []);
 });
+
+test("돌봄 수요 양식은 그대로 저장할 수 있다", async () => {
+  const { templates, validateSurvey } = await import("../js/core.js");
+  const t = templates().care;
+  const errors = validateSurvey({ group: "grade", title: t.title, desc: t.desc, deadlineMs: null, questions: t.questions });
+  assert.deepEqual(errors, []);
+});

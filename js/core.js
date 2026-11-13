@@ -339,6 +339,18 @@ export function templates() {
         { id: newId(6), type: "text", label: "하고 싶은 말", required: false },
       ],
     },
+    care: {
+      title: "21일 학부모 교육 돌봄 수요 조사",
+      desc: "21일 학부모교육 때 돌봄 수요가 있으면 돌봄 상황을 고려해서 돌봄을 추진해 보고자 합니다. (1,2,3학년 모두 돌봄이 이루어질 수 있어 전체 돌봄 인원수가 너무 많을 경우 돌봄을 다시 생각해봐야 할 수도 있음)\n원하시는 가정이 계시면 댓글 내일까지 부탁드립니다.",
+      questions: [
+        { id: newId(6), type: "choice", label: "학부모 교육 돌봄 필요 여부", required: true,
+          options: [{ id: newId(6), label: "돌봄이 필요합니다" }, { id: newId(6), label: "돌봄이 필요하지 않습니다" }] },
+        { id: newId(6), type: "count", label: "돌봄이 필요한 자녀 수", required: false, unit: "명" },
+        { id: newId(6), type: "multi", label: "돌봄이 필요한 자녀 학년", required: false,
+          options: [{ id: newId(6), label: "1학년" }, { id: newId(6), label: "2학년" }, { id: newId(6), label: "3학년" }] },
+        { id: newId(6), type: "text", label: "전달 사항", required: false },
+      ],
+    },
     picnic: {
       title: "야유회 참석 인원",
       desc: "가족 단위로 참석 인원을 적어 주세요.",
